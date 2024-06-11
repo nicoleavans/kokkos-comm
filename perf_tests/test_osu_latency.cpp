@@ -1,4 +1,3 @@
-#define BENCHMARK "OSU MPI%s Latency Test"
 /*
  * Copyright (c) 2002-2024 the Network-Based Computing Laboratory
  * (NBCL), The Ohio State University.
@@ -8,7 +7,6 @@
  * For detailed copyright and licensing information, please refer to the
  * copyright file COPYRIGHT in the top level OMB directory.
  */
-#include <osu_util_mpi.h>
 #include "KokkosComm.hpp"
 
 double calculate_total(double, double, double);
@@ -30,7 +28,6 @@ int main(int argc, char *argv[])
     int mpi_type_itr = 0, mpi_type_size = 0, mpi_type_name_length = 0;
     char mpi_type_name_str[OMB_DATATYPE_STR_MAX_LEN];
     MPI_Datatype mpi_type_list[OMB_NUM_DATATYPES];
-    int papi_eventset = OMB_PAPI_NULL;
     MPI_Comm omb_comm = MPI_COMM_NULL;
     omb_mpi_init_data omb_init_h;
     options.bench = PT2PT;
@@ -38,9 +35,6 @@ int main(int argc, char *argv[])
     struct omb_buffer_sizes_t omb_buffer_sizes;
     double *omb_lat_arr = NULL;
     struct omb_stat_t omb_stat;
-
-    set_header(HEADER);
-    set_benchmark_name("osu_latency");
 
     po_ret = process_options(argc, argv);
     omb_populate_mpi_type_list(mpi_type_list);
@@ -122,7 +116,6 @@ int main(int argc, char *argv[])
     }
 
     print_preamble(myid);
-    omb_papi_init(&papi_eventset);
 
     /* Latency test */
     for (mpi_type_itr = 0; mpi_type_itr < options.omb_dtype_itr;
@@ -176,9 +169,6 @@ int main(int argc, char *argv[])
             t_total = 0.0;
 
             for (i = 0; i < options.iterations + options.skip; i++) {
-                if (i == options.skip) {
-                    omb_papi_start(&papi_eventset);
-                }
                 if (options.validate) {
                     set_buffer_validation(s_buf, r_buf, size, options.accel, i,
                                           omb_curr_datatype, omb_buffer_sizes);
@@ -279,8 +269,6 @@ int main(int argc, char *argv[])
                 }
             }
 
-            omb_papi_stop_and_print(&papi_eventset, size);
-
             if (myid == 0) {
                 double latency = (t_total * 1e6) / (2.0 * options.iterations);
                 fprintf(stdout, "%-*d", 10, size);
@@ -322,7 +310,6 @@ int main(int argc, char *argv[])
     }
     omb_graph_combined_plot(&omb_graph_options, benchmark_name);
     omb_graph_free_data_buffers(&omb_graph_options);
-    omb_papi_free(&papi_eventset);
     if (options.buf_num == SINGLE) {
         free_memory(s_buf, r_buf, myid);
     }
