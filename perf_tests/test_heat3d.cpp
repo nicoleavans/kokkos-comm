@@ -8,31 +8,6 @@ struct SpaceInstance {
   static bool overlap() { return false; }
 };
 
-#ifndef KOKKOS_REMOTE_SPACES_ENABLE_DEBUG
-#ifdef KOKKOS_ENABLE_CUDA
-template <>
-struct SpaceInstance<Kokkos::Cuda> {
-  static Kokkos::Cuda create() {
-    cudaStream_t stream;
-    cudaStreamCreate(&stream);
-    return Kokkos::Cuda(stream);
-  }
-  static void destroy(Kokkos::Cuda& space) {
-    cudaStream_t stream = space.cuda_stream();
-    cudaStreamDestroy(stream);
-  }
-  static bool overlap() {
-    bool value          = true;
-    auto local_rank_str = std::getenv("CUDA_LAUNCH_BLOCKING");
-    if (local_rank_str) {
-      value = (std::stoi(local_rank_str) == 0);
-    }
-    return value;
-  }
-};
-#endif
-#endif
-
 struct CommHelper {
   MPI_Comm comm;
 
@@ -73,13 +48,6 @@ struct CommHelper {
     up    = y == ny - 1 ? -1 : me + nx;
     front = z == 0 ? -1 : me - nx * ny;
     back  = z == nz - 1 ? -1 : me + nx * ny;
-
-#if KOKKOS_REMOTE_SPACES_ENABLE_DEBUG
-    printf("NumRanks: %i Me: %i Grid: %i %i %i MyPos: %i %i %i\n", nranks, me,
-           nx, ny, nz, x, y, z);
-    printf("Me: %i MyNeighs: %i %i %i %i %i %i\n", me, left, right, down, up,
-           front, back);
-#endif
   }
 
   template <class ViewType>
@@ -155,11 +123,6 @@ struct System {
     X_lo = Y_lo = Z_lo = 0;
     X_hi = Y_hi = Z_hi = X;
     N                  = 10000;
-#if KOKKOS_REMOTE_SPACES_ENABLE_DEBUG
-    I = 10;
-#else
-    I = N - 1;
-#endif
     T       = Kokkos::View<double***>();
     dT      = Kokkos::View<double***>();
     T0      = 0.0;
@@ -200,10 +163,6 @@ struct System {
     Z_hi   = Z_lo + dZ;
     if (Z_hi > Z) Z_hi = Z;
 
-#if KOKKOS_REMOTE_SPACES_ENABLE_DEBUG
-    printf("My Domain: %i (%i %i %i) (%i %i %i)\n", comm.me, X_lo, Y_lo, Z_lo,
-           X_hi, Y_hi, Z_hi);
-#endif
     T  = Kokkos::View<double***>("System::T", X_hi - X_lo, Y_hi - Y_lo,
                                 Z_hi - Z_lo);
     dT = Kokkos::View<double***>("System::dT", T.extent(0), T.extent(1),
@@ -306,11 +265,7 @@ struct System {
         double time = timer.seconds();
         time_all += time - old_time;
         GUPs += 1e-9 * (dT.size() / time_inner);
-#if KOKKOS_REMOTE_SPACES_ENABLE_DEBUG
-        if ((t % I == 0 || t == N) && (comm.me == 0)) {
-#else
         if ((t == N) && (comm.me == 0)) {
-#endif
           printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
                  comm.nranks, t, T_ave, time_inner, time_surface, time_update,
                  time - old_time, /* time last iter */
@@ -613,3 +568,27 @@ int main(int argc, char* argv[]) {
   Kokkos::finalize();
   MPI_Finalize();
 }
+
+/*
+Construction Zone: google benchmark integration
+*/
+#include "test_utils.hpp"
+
+template <typename Space, typename View>
+void heat3d(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
+  //do something
+}
+
+void benchmark_heat3d(benchmark::State &state){
+  auto space      = Kokkos::DefaultExecutionSpace();
+  using view_type = Kokkos::View<Scalar *>;
+  view_type a("", 1000000);
+
+  while (state.KeepRunning()) {
+    do_iteration(state, MPI_COMM_WORLD, heat3d<Kokkos::DefaultExecutionSpace, view_type>, space, rank, a);
+  }
+  
+  state.SetBytesProcessed(sizeof(Scalar) * state.iterations() * a.size() * 2);
+}
+
+BENCHMARK(benchmark_heat3d)->UseManualTime()->Unit(benchmark::kMillisecond);
