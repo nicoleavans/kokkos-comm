@@ -25,42 +25,37 @@ template <typename Space, typename View>
 void osu_latency(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     bool usingMPI, usingKokkosComm; //TODO where do I want this to come from
     double t_start = 0.0, t_end = 0.0, t_total = 0.0;
-    int iter;
     if(usingMPI){ //TODO separate into two methods? just run both and compare?
         MPI_Barrier(MPI_COMM_WORLD);
         t_total = 0.0;
-        for(int j = 0; j < iter; j++){
-            if(rank == 0){
-                t_start = MPI_Wtime();
-                //MPI_Send(s_buf, num_elements, curr_datatype, 1, 1, comm); 
-                //MPI_Recv(r_buf, num_elements, curr_datatype, 1, 1, comm, &reqstat); 
-                t_end = MPI_Wtime();
-                t_total += (t_end - t_start);
-            } else if (rank == 1){
-                //MPI_Recv(r_buf, num_elements, curr_datatype, 0, 1, comm, &reqstat);
-                //MPI_Send(s_buf, num_elements, curr_datatype, 0, 1, comm);
-            }
+        if(rank == 0){
+            t_start = MPI_Wtime();
+            //MPI_Send(s_buf, num_elements, curr_datatype, 1, 1, comm); 
+            //MPI_Recv(r_buf, num_elements, curr_datatype, 1, 1, comm, &reqstat); 
+            t_end = MPI_Wtime();
+            t_total += (t_end - t_start);
+        } else if (rank == 1){
+            //MPI_Recv(r_buf, num_elements, curr_datatype, 0, 1, comm, &reqstat);
+            //MPI_Send(s_buf, num_elements, curr_datatype, 0, 1, comm);
         }
         if(rank == 0){
-            double latency = (t_total * 1e6) / (2.0 * iter); //TODO where is 1e6 coming from?
+            double latency = t_total * 1e6; //TODO where is 1e6 coming from?
         }
     } else if(usingKokkosComm){ //TODO probably just use else
         MPI_Barrier(MPI_COMM_WORLD);
         t_total = 0.0;
-        for(int j = 0; j < iter; j++){
-            if(rank == 0){
-                Kokkos::Timer timer; //TODO what to do w/ timer given benchmark utils?
-                KokkosComm::send(space, v, 0, 0, comm);
-                KokkosComm::recv(space, v, 0, 0, comm);
-                t_total = timer.seconds();
-                timer.reset();
-            } else if (rank == 1){
-                KokkosComm::recv(space, v, 0, 0, comm);
-                KokkosComm::send(space, v, 0, 0, comm);
-            }
+        if(rank == 0){
+            Kokkos::Timer timer; //TODO what to do w/ timer given benchmark utils?
+            KokkosComm::send(space, v, 0, 0, comm);
+            KokkosComm::recv(space, v, 0, 0, comm);
+            t_total = timer.seconds();
+            timer.reset();
+        } else if (rank == 1){
+            KokkosComm::recv(space, v, 0, 0, comm);
+            KokkosComm::send(space, v, 0, 0, comm);
         }
         if(rank == 0){
-            double latency = (t_total * 1e6) / (2.0 * iter); //TODO where is 1e6 coming from?
+            double latency = t_total * 1e6; //TODO where is 1e6 coming from?
         }
     }
 }
