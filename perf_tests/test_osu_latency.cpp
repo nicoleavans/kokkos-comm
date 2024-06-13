@@ -35,34 +35,35 @@ void osu_latency_Kokkos_Comm(benchmark::State &, MPI_Comm comm, const Space &spa
         KokkosComm::send(space, v, 0, 0, comm);
     }
     if(rank == 0){
-        double latency = t_total * 1e6; //TODO where is 1e6 coming from?
+        double latency = t_total * 1e6;
     }
 }
 
 template <typename Space, typename View>
 void osu_latency_MPI(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     double t_start = 0.0, t_end = 0.0, t_total = 0.0;
+    MPI_Request req;
     MPI_Barrier(MPI_COMM_WORLD);
     if(rank == 0){
         t_start = MPI_Wtime();
-        //MPI_Send(s_buf, num_elements, curr_datatype, 1, 1, comm); 
-        //MPI_Recv(r_buf, num_elements, curr_datatype, 1, 1, comm, &reqstat); 
+        MPI_Send(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 1, 0, comm); 
+        MPI_Recv(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 1, 0, comm, &req); 
         t_end = MPI_Wtime();
         t_total += (t_end - t_start);
     } else if (rank == 1){
-        //MPI_Recv(r_buf, num_elements, curr_datatype, 0, 1, comm, &reqstat);
-        //MPI_Send(s_buf, num_elements, curr_datatype, 0, 1, comm);
+        MPI_Recv(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 0, 0, comm, &req);
+        MPI_Send(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 0, 0, comm);
     }
     if(rank == 0){
-        double latency = t_total * 1e6; //TODO where is 1e6 coming from?
+        double latency = t_total * 1e6;
     }
 }
 
 void benchmark_osu_latency(benchmark::State &state){
     int rank, size;
-    
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+
     if(size != 2){
         state.SkipWithError("benchmark_osu_latency needs exactly 2 ranks");
     }
