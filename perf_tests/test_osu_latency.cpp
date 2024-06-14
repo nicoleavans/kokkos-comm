@@ -21,29 +21,6 @@
 #include "test_utils.hpp"
 #include "KokkosComm.hpp"
 
-template<typename T>
-MPI_Datatype getMPIDatatype() {
-	if (std::is_same<T, float>::value){
-	    return MPI_FLOAT;
-	} else if (std::is_same<T, double>::value){
-        return MPI_DOUBLE;
-	} else if (std::is_same<T, Kokkos::complex<float>>::value) {
-		return MPI_C_COMPLEX;
-	} else if (std::is_same<T, Kokkos::complex<double>>::value) {
-		return MPI_C_DOUBLE_COMPLEX;
-	} else if (std::is_same<T, int>::value) {
-        return MPI_INT;
-    } else if (std::is_same<T, unsigned>::value) {
-        return MPI_UNSIGNED;
-    } else if (std::is_same<T, int64_t>::value) {
-        return MPI_INT64_T;
-    } else if (std::is_same<T, size_t>::value) {
-        return MPI_UNSIGNED_LONG;
-    } else {
-        return MPI_DATATYPE_NULL;
-    }
-}
-
 template <typename Space, typename View>
 void osu_latency_Kokkos_Comm(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     double t_total = 0.0;
