@@ -16,7 +16,7 @@ if (CMAKE_VERSION VERSION_GREATER_EQUAL "3.24.0")
 cmake_policy(SET CMP0135 NEW)
 endif()
 
-set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+set(BENCHMARK_ENABLE_TESTING ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
   benchmark
   URL https://github.com/google/benchmark/archive/refs/tags/v1.8.3.zip

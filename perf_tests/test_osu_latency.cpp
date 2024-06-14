@@ -48,9 +48,9 @@ template <typename Space, typename View>
 void osu_latency_Kokkos_Comm(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     double t_total = 0.0;
     if(rank == 0){
-        Kokkos::Timer timer; //TODO what to do w/ timer given benchmark utils?
-        KokkosComm::send(space, v, 0, 0, comm);
-        KokkosComm::recv(space, v, 0, 0, comm);
+        Kokkos::Timer timer;
+        KokkosComm::send(space, v, 1, 0, comm);
+        KokkosComm::recv(space, v, 1, 0, comm);
         t_total = timer.seconds();
         timer.reset();
     } else if (rank == 1){
@@ -66,16 +66,15 @@ void osu_latency_Kokkos_Comm(benchmark::State &, MPI_Comm comm, const Space &spa
 template <typename Space, typename View>
 void osu_latency_MPI(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     double t_start = 0.0, t_end = 0.0, t_total = 0.0;
-    MPI_Request req;
     MPI_Barrier(MPI_COMM_WORLD);
     if(rank == 0){
         t_start = MPI_Wtime();
         MPI_Send(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 1, 0, comm); 
-        MPI_Recv(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 1, 0, comm, &req); 
+        MPI_Recv(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 1, 0, comm, MPI_STATUS_IGNORE); 
         t_end = MPI_Wtime();
         t_total += (t_end - t_start);
     } else if (rank == 1){
-        MPI_Recv(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 0, 0, comm, &req);
+        MPI_Recv(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 0, 0, comm, MPI_STATUS_IGNORE);
         MPI_Send(v.data(), v.size(), getMPIDatatype<typename View::value_type>(), 0, 0, comm);
     }
     if(rank == 0){
@@ -84,22 +83,20 @@ void osu_latency_MPI(benchmark::State &, MPI_Comm comm, const Space &space, int 
     }
 }
 
-void benchmark_osu_latency(benchmark::State &state){
+void benchmark_osu_latency_KokkosComm(benchmark::State &state){
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
     MPI_Comm_size(MPI_COMM_WORLD, &size);
-
     if(size != 2){
-        state.SkipWithError("benchmark_osu_latency needs exactly 2 ranks");
+        state.SkipWithError("benchmark_osu_latency_KokkosComm needs exactly 2 ranks");
     }
 
     using Scalar = double;
     auto space = Kokkos::DefaultExecutionSpace();
     using view_type = Kokkos::View<Scalar *>;
-
-    printf("Beginning benchmark_osu_latency\n");
-
     view_type a("", 1000000);
+
+    printf("Beginning benchmark_osu_latency_KokkosComm:\n"); //DEBUG
 
     while(state.KeepRunning()){
         do_iteration(state, MPI_COMM_WORLD, osu_latency_Kokkos_Comm<Kokkos::DefaultExecutionSpace, view_type>, space, rank, a);
@@ -108,4 +105,27 @@ void benchmark_osu_latency(benchmark::State &state){
     state.SetBytesProcessed(sizeof(Scalar) * state.iterations() * a.size() * 2);
 }
 
-BENCHMARK(benchmark_osu_latency)->UseManualTime()->Unit(benchmark::kMillisecond);
+void benchmark_osu_latency_MPI(benchmark::State &state){
+    int rank, size;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
+    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    if(size != 2){
+        state.SkipWithError("benchmark_osu_latency_MPI needs exactly 2 ranks");
+    }
+
+    using Scalar = double;
+    auto space = Kokkos::DefaultExecutionSpace();
+    using view_type = Kokkos::View<Scalar *>;
+    view_type a("", 1000000);
+
+    printf("Beginning benchmark_osu_latency_MPI:\n"); //DEBUG
+
+    while(state.KeepRunning()){
+        do_iteration(state, MPI_COMM_WORLD, osu_latency_MPI<Kokkos::DefaultExecutionSpace, view_type>, space, rank, a);
+    }
+
+    state.SetBytesProcessed(sizeof(Scalar) * state.iterations() * a.size() * 2);
+}
+
+BENCHMARK(benchmark_osu_latency_KokkosComm)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(benchmark_osu_latency_MPI)->UseManualTime()->Unit(benchmark::kMillisecond);
