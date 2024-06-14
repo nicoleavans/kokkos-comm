@@ -118,5 +118,5 @@ void benchmark_osu_latency_MPI(benchmark::State &state){
     state.counters["bytes"] = a.size() * 2;
 }
 
-BENCHMARK(benchmark_osu_latency_KokkosComm)->UseManualTime()->Unit(benchmark::kMicrosecond)->Arg(1)->Arg(64)->Arg(512)->Arg(4<<10)->Arg(8<<10);
-BENCHMARK(benchmark_osu_latency_MPI)->UseManualTime()->Unit(benchmark::kMicrosecond)->Arg(8)->Arg(64)->Arg(512)->Arg(4<<10)->Arg(8<<10);
+BENCHMARK(benchmark_osu_latency_KokkosComm)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
+BENCHMARK(benchmark_osu_latency_MPI)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
