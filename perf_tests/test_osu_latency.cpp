@@ -59,6 +59,7 @@ void osu_latency_Kokkos_Comm(benchmark::State &, MPI_Comm comm, const Space &spa
     }
     if(rank == 0){
         double latency = t_total * 1e6;
+        printf("KokkosComm Latency: %f for View size: %zu\n", latency, v.size());
     }
 }
 
@@ -79,6 +80,7 @@ void osu_latency_MPI(benchmark::State &, MPI_Comm comm, const Space &space, int 
     }
     if(rank == 0){
         double latency = t_total * 1e6;
+        printf("MPI Latency: %f for View size: %zu\n", latency, v.size());
     }
 }
 
@@ -94,6 +96,8 @@ void benchmark_osu_latency(benchmark::State &state){
     using Scalar = double;
     auto space = Kokkos::DefaultExecutionSpace();
     using view_type = Kokkos::View<Scalar *>;
+
+    printf("Beginning benchmark_osu_latency\n");
 
     view_type a("", 1000000);
 
