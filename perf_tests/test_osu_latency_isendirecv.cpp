@@ -24,8 +24,11 @@
 template <typename Space, typename View>
 void osu_latency_Kokkos_Comm_isendirecv(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     if(rank == 0){
-        KokkosComm::isend(space, v, 1, 0, comm);
-        KokkosComm::irecv(v, 1, 0, comm, MPI_REQUEST_NULL);
+        MPI_Request recvreq;
+        KokkosComm::Req sendreq = KokkosComm::isend(space, v, 1, 0, comm);
+        sendreq.wait();
+        KokkosComm::irecv(v, 1, 0, comm, recvreq);
+        MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
     } else if (rank == 1){
         MPI_Request sendreq;
         KokkosComm::irecv(v, 0, 0, comm, sendreq);
@@ -34,6 +37,7 @@ void osu_latency_Kokkos_Comm_isendirecv(benchmark::State &, MPI_Comm comm, const
         recvreq.wait();
     }
 }
+
 
 template <typename View>
 void osu_latency_MPI_isendirecv(benchmark::State &, MPI_Comm comm, int rank, const View &v){
