@@ -27,8 +27,11 @@ void osu_latency_Kokkos_Comm_isendirecv(benchmark::State &, MPI_Comm comm, const
         KokkosComm::isend(space, v, 1, 0, comm);
         KokkosComm::irecv(v, 1, 0, comm, MPI_REQUEST_NULL);
     } else if (rank == 1){
-        KokkosComm::irecv(v, 0, 0, comm, MPI_REQUEST_NULL);
-        KokkosComm::isend(space, v, 0, 0, comm);
+        MPI_Request sendreq;
+        KokkosComm::irecv(v, 0, 0, comm, sendreq);
+        MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
+        KokkosComm::Req recvreq = KokkosComm::isend(space, v, 0, 0, comm);
+        recvreq.wait();
     }
 }
 
@@ -37,13 +40,13 @@ void osu_latency_MPI_isendirecv(benchmark::State &, MPI_Comm comm, int rank, con
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Request sendreq, recvreq;
     if(rank == 0){
-        MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &sendreq); 
+        MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &sendreq);
         MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &recvreq);
-        MPI_Wait(&sendreq, MPI_STATUS_IGNORE); // Wait for send to complete
-        MPI_Wait(&recvreq, MPI_STATUS_IGNORE); // Wait for receive to complete 
+        MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
     } else if (rank == 1){
         MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &recvreq);
         MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &sendreq);
+        MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
     }
 }
 
