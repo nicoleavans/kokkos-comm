@@ -25,10 +25,8 @@ template <typename Space, typename View>
 void osu_latency_Kokkos_Comm_sendrecv(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     if(rank == 0){
         KokkosComm::send(space, v, 1, 0, comm);
-        KokkosComm::recv(space, v, 1, 0, comm);
     } else if (rank == 1){
         KokkosComm::recv(space, v, 0, 0, comm);
-        KokkosComm::send(space, v, 0, 0, comm);
     }
 }
 
@@ -37,10 +35,8 @@ void osu_latency_MPI_sendrecv(benchmark::State &, MPI_Comm comm, int rank, const
     MPI_Barrier(MPI_COMM_WORLD);
     if(rank == 0){
         MPI_Send(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm); 
-        MPI_Recv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, MPI_STATUS_IGNORE); 
     } else if (rank == 1){
         MPI_Recv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, MPI_STATUS_IGNORE);
-        MPI_Send(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm);
     }
 }
 

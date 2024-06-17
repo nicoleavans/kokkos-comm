@@ -24,20 +24,10 @@
 template <typename Space, typename View>
 void osu_latency_Kokkos_Comm_isendirecv(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
     if(rank == 0){
-        //MPI_Request sendreq;
         KokkosComm::Req sendreq = KokkosComm::isend(space, v, 1, 1, comm);
         sendreq.wait();
-        //MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 1, comm, &sendreq);
-        //MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
-
-        //KokkosComm::irecv(v, 1, 0, comm, recvreq);
-        //MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
     } else if (rank == 1){
         MPI_Request recvreq;
-        //KokkosComm::irecv(v, 0, 1, comm, recvreq);
-        //KokkosComm::Req sendreq = KokkosComm::isend(space, v, 0, 0, comm);
-        //sendreq.wait();
-        //KokkosComm::irecv(v, 0, 1, comm, recvreq);
         MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 1, comm, &recvreq);
         MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
     }
@@ -49,12 +39,10 @@ void osu_latency_MPI_isendirecv(benchmark::State &, MPI_Comm comm, int rank, con
     MPI_Request sendreq, recvreq;
     if(rank == 0){
         MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &sendreq);
-        MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &recvreq);
-        MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
+        MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
     } else if (rank == 1){
         MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &recvreq);
-        MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &sendreq);
-        MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
+        MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
     }
 }
 
@@ -93,5 +81,8 @@ void benchmark_osu_latency_MPI_isendirecv(benchmark::State &state){
     state.counters["bytes"] = a.size() * 2;
 }
 
-BENCHMARK(benchmark_osu_latency_KokkosComm_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
-BENCHMARK(benchmark_osu_latency_MPI_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
+// BENCHMARK(benchmark_osu_latency_KokkosComm_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
+// BENCHMARK(benchmark_osu_latency_MPI_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
+
+BENCHMARK(benchmark_osu_latency_KokkosComm_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 1024);
+BENCHMARK(benchmark_osu_latency_MPI_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 1024);
