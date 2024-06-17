@@ -23,38 +23,24 @@
 
 template <typename Space, typename View>
 void osu_latency_Kokkos_Comm(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
-    double t_total = 0.0;
     if(rank == 0){
-        Kokkos::Timer timer;
         KokkosComm::send(space, v, 1, 0, comm);
         KokkosComm::recv(space, v, 1, 0, comm);
-        t_total = timer.seconds();
-        timer.reset();
     } else if (rank == 1){
         KokkosComm::recv(space, v, 0, 0, comm);
         KokkosComm::send(space, v, 0, 0, comm);
-    }
-    if(rank == 0){
-        double latency = t_total * 1e6;
     }
 }
 
 template <typename View>
 void osu_latency_MPI(benchmark::State &, MPI_Comm comm, int rank, const View &v){
-    double t_start = 0.0, t_end = 0.0, t_total = 0.0;
     MPI_Barrier(MPI_COMM_WORLD);
     if(rank == 0){
-        t_start = MPI_Wtime();
         MPI_Send(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm); 
         MPI_Recv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, MPI_STATUS_IGNORE); 
-        t_end = MPI_Wtime();
-        t_total += (t_end - t_start);
     } else if (rank == 1){
         MPI_Recv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, MPI_STATUS_IGNORE);
         MPI_Send(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm);
-    }
-    if(rank == 0){
-        double latency = t_total * 1e6;
     }
 }
 
