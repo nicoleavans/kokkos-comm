@@ -1,5 +1,5 @@
 #include <Kokkos_Core.hpp>
-#include <mpi.h>
+#include "test_utils.hpp"
 
 template <class ExecSpace>
 struct SpaceInstance {
@@ -581,15 +581,10 @@ struct System {
   }
 };
 
-int main(int argc, char* argv[]) {
-  MPI_Init(&argc, &argv);
-  Kokkos::initialize(argc, argv);
-  {
-    System sys(MPI_COMM_WORLD);
-    if (sys.check_args(argc, argv)) sys.timestep();
-    sys.destroy_exec_spaces();
-  }
-
-  Kokkos::finalize();
-  MPI_Finalize();
+void benchmark_heat3d(benchmark::State &state) {
+  System sys(MPI_COMM_WORLD);
+  if (sys.check_args(argc, argv)) sys.timestep(); //TODO how to access argc & argv ?
+  sys.destroy_exec_spaces();
 }
+
+BENCHMARK(benchmark_heat3d)->UseManualTime()->Unit(benchmark::kMillisecond);
