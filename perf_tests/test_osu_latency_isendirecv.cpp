@@ -38,11 +38,11 @@ void osu_latency_MPI_isendirecv(benchmark::State &, MPI_Comm comm, int rank, con
     MPI_Barrier(comm);
     MPI_Request sendreq, recvreq;
     if(rank == 0){
-        MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &sendreq);
-        MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
-    } else if (rank == 1){
-        MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &recvreq);
+        MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &recvreq);
         MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
+    } else if (rank == 1){
+        MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &sendreq);
+        MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
     }
 }
 
