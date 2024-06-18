@@ -34,6 +34,7 @@ unset(BENCHMARK_ENABLE_TESTING)
 add_executable(perf_test-main test_main.cpp
   test_sendrecv.cpp
   test_2dhalo.cpp
+  test_heat3d.cpp
 )
 if(KOKKOSCOMM_ENABLE_TESTS)
   kokkoscomm_add_cxx_flags(TARGET perf_test-main)
