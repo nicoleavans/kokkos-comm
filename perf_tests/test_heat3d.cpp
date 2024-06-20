@@ -101,7 +101,7 @@ struct System {
   int mpi_active_requests;
 
   // size of system
-  int X_dim, Y, Z;
+  int X, Y, Z;
 
   // Local box
   int X_lo, Y_lo, Z_lo;
@@ -144,9 +144,9 @@ struct System {
 
   System(MPI_Comm comm_) : comm(comm_) {
     mpi_active_requests = 0;
-    X_dim = Y = Z = 200;
+    X = Y = Z = 200;
     X_lo = Y_lo = Z_lo = 0;
-    X_hi = Y_hi = Z_hi = X_dim;
+    X_hi = Y_hi = Z_hi = X;
     N                  = 10000;
     I = N - 1;
     T       = Kokkos::View<double***>();
@@ -176,10 +176,10 @@ struct System {
   }
 
   void setup_subdomain() {
-    int dX = (X_dim + comm.nx - 1) / comm.nx;
+    int dX = (X + comm.nx - 1) / comm.nx;
     X_lo   = dX * comm.x;
     X_hi   = X_lo + dX;
-    if (X_hi > X_dim) X_hi = X_dim;
+    if (X_hi > X) X_hi = X;
     int dY = (Y + comm.ny - 1) / comm.ny;
     Y_lo   = dY * comm.y;
     Y_hi   = Y_lo + dY;
@@ -197,7 +197,7 @@ struct System {
     // incoming halos
     if (X_lo != 0)
       T_left = buffer_t("System::T_left", Y_hi - Y_lo, Z_hi - Z_lo);
-    if (X_hi != X_dim)
+    if (X_hi != X)
       T_right = buffer_t("System::T_right", Y_hi - Y_lo, Z_hi - Z_lo);
     if (Y_lo != 0)
       T_down = buffer_t("System::T_down", X_hi - X_lo, Z_hi - Z_lo);
@@ -210,7 +210,7 @@ struct System {
     // outgoing halo
     if (X_lo != 0)
       T_left_out = buffer_t("System::T_left_out", Y_hi - Y_lo, Z_hi - Z_lo);
-    if (X_hi != X_dim)
+    if (X_hi != X)
       T_right_out = buffer_t("System::T_right_out", Y_hi - Y_lo, Z_hi - Z_lo);
     if (Y_lo != 0)
       T_down_out = buffer_t("System::T_down_out", X_hi - X_lo, Z_hi - Z_lo);
@@ -224,7 +224,7 @@ struct System {
 
   void print_help() {
     printf("Options (default):\n");
-    printf("  -X IARG: (%i) num elements in X direction\n", X_dim);
+    printf("  -X IARG: (%i) num elements in X direction\n", X);
     printf("  -Y IARG: (%i) num elements in Y direction\n", Y);
     printf("  -Z IARG: (%i) num elements in Z direction\n", Z);
     printf("  -N IARG: (%i) num timesteps\n", N);
@@ -261,7 +261,7 @@ struct System {
       time_inner += time_b - time_a;
       time_surface += time_c - time_b;
       time_update += time_d - time_c;
-      T_ave /= 1e-9 * (X_dim * Y * Z);
+      T_ave /= 1e-9 * (X * Y * Z);
       if ((t % I == 0 || t == N) && (comm.me == 0)) {
         double time = timer.seconds();
         time_all += time - old_time;
@@ -271,7 +271,7 @@ struct System {
                  comm.nranks, t, T_ave, time_inner, time_surface, time_update,
                  time - old_time, /* time last iter */
                  time_all,        /* current runtime  */
-                 GUPs / t, X_dim, 1e-6 * (X_dim * sizeof(double)));
+                 GUPs / t, X, 1e-6 * (X * sizeof(double)));
           old_time = time;
         }
       }
@@ -366,7 +366,7 @@ struct System {
 
     // Heat conduction with Halo
     if (x == 0 && X_lo != 0) dT_xyz += q * (T_left(y, z) - T_xyz);
-    if (x == (NX - 1) && X_hi != X_dim) dT_xyz += q * (T_right(y, z) - T_xyz);
+    if (x == (NX - 1) && X_hi != X) dT_xyz += q * (T_right(y, z) - T_xyz);
     if (y == 0 && Y_lo != 0) dT_xyz += q * (T_down(x, z) - T_xyz);
     if (y == (NY - 1) && Y_hi != Y) dT_xyz += q * (T_up(x, z) - T_xyz);
     if (z == 0 && Z_lo != 0) dT_xyz += q * (T_front(x, y) - T_xyz);
@@ -377,7 +377,7 @@ struct System {
 
     // thermal radiation
     int num_surfaces = ((x == 0 && X_lo == 0) ? 1 : 0) +
-                       ((x == (NX - 1) && X_hi == X_dim) ? 1 : 0) +
+                       ((x == (NX - 1) && X_hi == X) ? 1 : 0) +
                        ((y == 0 && Y_lo == 0) ? 1 : 0) +
                        ((y == (NY - 1) && Y_hi == Y) ? 1 : 0) +
                        ((z == 0 && Z_lo == 0) ? 1 : 0) +
@@ -404,7 +404,7 @@ struct System {
                         Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0));
       mar++;
     }
-    if (X_hi != X_dim) {
+    if (X_hi != X) {
       Kokkos::deep_copy(
           E_right, T_right_out,
           Kokkos::subview(T, X_hi - X_lo - 1, Kokkos::ALL, Kokkos::ALL));
@@ -444,7 +444,7 @@ struct System {
                        &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       mar++;
     }
-    if (X_hi != X_dim) {
+    if (X_hi != X) {
       E_right.fence();
       comm.isend_irecv(comm.right, T_right_out, T_right,
                        &mpi_requests_send[mar], &mpi_requests_recv[mar]);
@@ -479,9 +479,9 @@ struct System {
     using policy_back_t =
         Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<back>, int>;
 
-    int X_dim = T.extent(0);
-    int Y = T.extent(1);
-    int Z = T.extent(2);
+    X = T.extent(0);
+    Y = T.extent(1);
+    Z = T.extent(2);
     if (mpi_active_requests > 0) {
       MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE);
       MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE);
@@ -501,25 +501,25 @@ struct System {
     Kokkos::parallel_for(
         "ComputeSurfaceDT_Down",
         Kokkos::Experimental::require(
-            policy_down_t(E_down, {1, 0}, {X_dim - 1, Z}),
+            policy_down_t(E_down, {1, 0}, {X - 1, Z}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight),
         *this);
     Kokkos::parallel_for(
         "ComputeSurfaceDT_Up",
         Kokkos::Experimental::require(
-            policy_up_t(E_up, {1, 0}, {X_dim - 1, Z}),
+            policy_up_t(E_up, {1, 0}, {X - 1, Z}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight),
         *this);
     Kokkos::parallel_for(
         "ComputeSurfaceDT_front",
         Kokkos::Experimental::require(
-            policy_front_t(E_front, {1, 1}, {X_dim - 1, Y - 1}),
+            policy_front_t(E_front, {1, 1}, {X - 1, Y - 1}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight),
         *this);
     Kokkos::parallel_for(
         "ComputeSurfaceDT_back",
         Kokkos::Experimental::require(
-            policy_back_t(E_back, {1, 1}, {X_dim - 1, Y - 1}),
+            policy_back_t(E_back, {1, 1}, {X - 1, Y - 1}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight),
         *this);
   }
@@ -541,14 +541,14 @@ struct System {
   double update_T() {
     using policy_t =
         Kokkos::MDRangePolicy<Kokkos::Rank<3>, Kokkos::IndexType<int>>;
-    int X_dim       = T.extent(0);
-    int Y       = T.extent(1);
-    int Z       = T.extent(2);
+    X       = T.extent(0);
+    Y       = T.extent(1);
+    Z       = T.extent(2);
     double my_T = 0.0;
     Kokkos::parallel_reduce(
         "UpdateT",
         Kokkos::Experimental::require(
-            policy_t(E_bulk, {0, 0, 0}, {X_dim, Y, Z}, {10, 10, 10}),
+            policy_t(E_bulk, {0, 0, 0}, {X, Y, Z}, {10, 10, 10}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight),
         UpdateT(T, dT, dt), my_T);
     double sum_T;
