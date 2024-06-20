@@ -583,7 +583,15 @@ struct System {
 
 void benchmark_heat3d(benchmark::State &state) {
   System sys(MPI_COMM_WORLD);
-  if (sys.check_args(argc, argv)) sys.timestep(); //TODO how to access argc & argv ?
+  sys.X = 100; sys.Y = 100; sys.Z = 100;
+  sys.N = 1000;
+  sys.I = 10;
+  sys.T0 = 300;
+  sys.dt = 0.01;
+  sys.q = 5000;
+  sys.sigma = 0.5;
+  sys.P = 0.01;
+  sys.timestep();
   sys.destroy_exec_spaces();
 }
 
