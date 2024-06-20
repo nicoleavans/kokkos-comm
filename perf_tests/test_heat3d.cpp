@@ -1,5 +1,6 @@
 #include <Kokkos_Core.hpp>
 #include "test_utils.hpp"
+#include <iostream>
 
 template <class ExecSpace>
 struct SpaceInstance {
@@ -147,7 +148,7 @@ struct System {
     X = Y = Z = 200;
     X_lo = Y_lo = Z_lo = 0;
     X_hi = Y_hi = Z_hi = X;
-    N                  = 10000;
+    N                  = 10; //10000 reduced for quick testing
     I = N - 1;
     T       = Kokkos::View<double***>();
     dT      = Kokkos::View<double***>();
@@ -206,7 +207,6 @@ struct System {
       T_front = buffer_t("System::T_front", X_hi - X_lo, Y_hi - Y_lo);
     if (Z_hi != Z)
       T_back = buffer_t("System::T_back", X_hi - X_lo, Y_hi - Y_lo);
-
     // outgoing halo
     if (X_lo != 0)
       T_left_out = buffer_t("System::T_left_out", Y_hi - Y_lo, Z_hi - Z_lo);
@@ -275,7 +275,10 @@ struct System {
           old_time = time;
         }
       }
+      std::cout << "debug 1: for (int t = 0; t <= N; t++) { \n";
+      std::cout << "t = " << t << " N = " << N << '\n';
     }
+    std::cout << "debug 2\n";
   }
 
   // Compute inner update
@@ -561,7 +564,9 @@ void benchmark_heat3d(benchmark::State &state) {
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
   sys.timestep();
+  std::cout << "debug 3\n";
   sys.destroy_exec_spaces();
+  std::cout << "debug 4\n";
 }
 
 BENCHMARK(benchmark_heat3d)->UseManualTime()->Unit(benchmark::kMillisecond);
