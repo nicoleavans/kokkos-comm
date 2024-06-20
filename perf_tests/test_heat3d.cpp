@@ -236,30 +236,6 @@ struct System {
     printf("  -P FARG: (%lf) incoming power\n", P);
   }
 
-  // check command line args
-  bool check_args(int argc, char* argv[]) {
-    for (int i = 1; i < argc; i++) {
-      if (strcmp(argv[i], "-h") == 0) {
-        print_help();
-        return false;
-      }
-    }
-    for (int i = 1; i < argc; i++) {
-      if (strcmp(argv[i], "-X") == 0) X = atoi(argv[i + 1]);
-      if (strcmp(argv[i], "-Y") == 0) Y = atoi(argv[i + 1]);
-      if (strcmp(argv[i], "-Z") == 0) Z = atoi(argv[i + 1]);
-      if (strcmp(argv[i], "-N") == 0) N = atoi(argv[i + 1]);
-      if (strcmp(argv[i], "-I") == 0) I = atoi(argv[i + 1]);
-      if (strcmp(argv[i], "-T0") == 0) T0 = atof(argv[i + 1]);
-      if (strcmp(argv[i], "-dt") == 0) dt = atof(argv[i + 1]);
-      if (strcmp(argv[i], "-q") == 0) q = atof(argv[i + 1]);
-      if (strcmp(argv[i], "-sigma") == 0) sigma = atof(argv[i + 1]);
-      if (strcmp(argv[i], "-P") == 0) P = atof(argv[i + 1]);
-    }
-    setup_subdomain();
-    return true;
-  }
-
   // run_time_loops
   void timestep() {
     Kokkos::Timer timer;
