@@ -432,16 +432,14 @@ struct System {
 };
 
 void benchmark_heat3d_mpi(benchmark::State &state) {
-  bool kc = false;
+  bool kc = false; //TODO change from bool since we need three options
   auto start = std::chrono::high_resolution_clock::now();
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
   sys.timestep(kc);
   sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
-  auto elapsed_seconds =
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-        end - start);
+  auto elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
   std::cout << "mpi_elapsed_seconds = " << elapsed_seconds << '\n';
   state.SetIterationTime(elapsed_seconds.count());
   if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
@@ -449,17 +447,31 @@ void benchmark_heat3d_mpi(benchmark::State &state) {
   }
 }
 
-void benchmark_heat3d_kc(benchmark::State &state) {
-  bool kc = true;
+void benchmark_heat3d_kc_repack(benchmark::State &state) {
+  bool kc = true; //TODO change from bool since we need three options
   auto start = std::chrono::high_resolution_clock::now();
   // System sys(MPI_COMM_WORLD);
   // sys.setup_subdomain();
   // sys.timestep(kc);
   // sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
-  auto elapsed_seconds =
-      std::chrono::duration_cast<std::chrono::duration<double>>(
-        end - start);
+  auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
+  std::cout << "kc_elapsed_seconds = " << elapsed_seconds << '\n';
+  state.SetIterationTime(elapsed_seconds.count());
+  if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
+    state.SkipWithMessage("Loop exited prematurely!");
+  }
+}
+
+void benchmark_heat3d_kc_datatype(benchmark::State &state) {
+  bool kc = true; //TODO change from bool since we need three options
+  auto start = std::chrono::high_resolution_clock::now();
+  // System sys(MPI_COMM_WORLD);
+  // sys.setup_subdomain();
+  // sys.timestep(kc);
+  // sys.destroy_exec_spaces();
+  auto end = std::chrono::high_resolution_clock::now();
+  auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
   std::cout << "kc_elapsed_seconds = " << elapsed_seconds << '\n';
   state.SetIterationTime(elapsed_seconds.count());
   if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
@@ -468,4 +480,5 @@ void benchmark_heat3d_kc(benchmark::State &state) {
 }
 
 BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMillisecond);
-BENCHMARK(benchmark_heat3d_kc)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(benchmark_heat3d_kc_repack)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(benchmark_heat3d_kc_datatype)->UseManualTime()->Unit(benchmark::kMillisecond);
