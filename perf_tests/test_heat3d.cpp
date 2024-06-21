@@ -210,7 +210,6 @@ struct System {
           old_time = time;
         }
       }
-      std::cout << "debug: t = " << t << " N = " << N << '\n';
     }
   }
 
@@ -441,7 +440,6 @@ void benchmark_heat3d(benchmark::State &state) {
       std::chrono::duration_cast<std::chrono::duration<double>>(
         end - start);
   std::cout << "elapsed_seconds = " << elapsed_seconds << '\n';
-  std::cout << "st.iterations() = " << state.iterations() << " st.max_iterations = " << state.max_iterations << '\n';
   state.SetIterationTime(elapsed_seconds.count());
   if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
     state.SkipWithError("Loop exited prematurely!");
