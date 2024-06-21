@@ -222,20 +222,6 @@ struct System {
       T_back_out = buffer_t("System::T_back_out", X_hi - X_lo, Y_hi - Y_lo);
   }
 
-  void print_help() {
-    printf("Options (default):\n");
-    printf("  -X IARG: (%i) num elements in X direction\n", X);
-    printf("  -Y IARG: (%i) num elements in Y direction\n", Y);
-    printf("  -Z IARG: (%i) num elements in Z direction\n", Z);
-    printf("  -N IARG: (%i) num timesteps\n", N);
-    printf("  -I IARG: (%i) print interval\n", I);
-    printf("  -T0 FARG: (%lf) initial temperature\n", T0);
-    printf("  -dt FARG: (%lf) timestep size\n", dt);
-    printf("  -q FARG: (%lf) thermal conductivity\n", q);
-    printf("  -sigma FARG: (%lf) thermal radiation\n", sigma);
-    printf("  -P FARG: (%lf) incoming power\n", P);
-  }
-
   // run_time_loops
   void timestep() {
     Kokkos::Timer timer;
