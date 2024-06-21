@@ -1,6 +1,8 @@
 #include <Kokkos_Core.hpp>
+#include "KokkosComm.hpp"
 #include "test_utils.hpp"
 #include <iostream>
+#include <exception>
 
 template <class ExecSpace>
 struct SpaceInstance {
@@ -77,6 +79,52 @@ struct CommHelper {
   }
 };
 
+// struct CommHelperKC {
+//   MPI_Comm comm;
+
+//   // Num MPI ranks in each dimension
+//   int nx, ny, nz;
+
+//   int me; // My rank
+//   int nranks; // N ranks
+//   int x, y, z; // My pos in proc grid
+
+//   // Neighbor Ranks
+//   int up, down, left, right, front, back;
+
+//   CommHelper(MPI_Comm comm_) {
+//     comm = comm_;
+
+//     MPI_Comm_size(comm, &nranks);
+//     MPI_Comm_rank(comm, &me);
+
+//     nx = std::pow(1.0 * nranks, 1.0 / 3.0);
+//     while (nranks % nx != 0) nx++;
+
+//     ny = std::sqrt(1.0 * (nranks / nx));
+//     while ((nranks / nx) % ny != 0) ny++;
+
+//     nz    = nranks / nx / ny;
+//     x     = me % nx;
+//     y     = (me / nx) % ny;
+//     z     = (me / nx / ny);
+//     left  = x == 0 ? -1 : me - 1;
+//     right = x == nx - 1 ? -1 : me + 1;
+//     down  = y == 0 ? -1 : me - nx;
+//     up    = y == ny - 1 ? -1 : me + nx;
+//     front = z == 0 ? -1 : me - nx * ny;
+//     back  = z == nz - 1 ? -1 : me + nx * ny;
+//   }
+
+//   template <class ViewType>
+//   void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer,
+//                    MPI_Request* request_send, MPI_Request* request_recv) {
+//     MPI_Irecv(recv_buffer.data(), recv_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_recv);
+//     MPI_Isend(send_buffer.data(), send_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_send);
+//     //TODO KokkosComm::Req sendreq = KokkosComm::isend(space, );
+//   }
+// };
+
 struct System {
   // Communicator
   CommHelper comm;
@@ -114,7 +162,7 @@ struct System {
     X = Y = Z = 200;
     X_lo = Y_lo = Z_lo = 0;
     X_hi = Y_hi = Z_hi = X;
-    N                  = 10; //10000 reduced for quick testing
+    N                  = 5; //10000 reduced for quick testing
     I = N - 1;
     T       = Kokkos::View<double***>();
     dT      = Kokkos::View<double***>();
@@ -188,20 +236,29 @@ struct System {
       Kokkos::fence();
       time_b = timer.seconds();
       exchange_T_halo();
+      std::cout << "timestep debug 2.6\n";
       compute_surface_dT();
+      std::cout << "timestep debug 2.7\n";
       Kokkos::fence();
+      std::cout << "timestep debug 3\n";
       time_c       = timer.seconds();
+      std::cout << "timestep debug 3.1\n";
       double T_ave = update_T();
+      std::cout << "timestep debug 3.2\n";
       time_d       = timer.seconds();
       time_inner += time_b - time_a;
       time_surface += time_c - time_b;
       time_update += time_d - time_c;
+      std::cout << "timestep debug 3.3\n";
       T_ave /= 1e-9 * (X * Y * Z);
+      std::cout << "timestep debug 4\n";
       if ((t % I == 0 || t == N) && (comm.me == 0)) {
+        std::cout << "timestep debug 5\n";
         double time = timer.seconds();
         time_all += time - old_time;
         GUPs += 1e-9 * (dT.size() / time_inner);
         if ((t == N) && (comm.me == 0)) {
+          std::cout << "timestep debug 6\n";
           printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
                  comm.nranks, t, T_ave, time_inner, time_surface, time_update,
                  time - old_time, /* time last iter */
@@ -361,42 +418,51 @@ struct System {
     using policy_up_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<up>, int>;
     using policy_front_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<front>, int>;
     using policy_back_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<back>, int>;
+    std::cout << "debug compute_surface_dT 1\n";
 
     X = T.extent(0); Y = T.extent(1); Z = T.extent(2);
+    std::cout << "debug compute_surface_dT 2\n";
     if (mpi_active_requests > 0) {
       MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE);
       MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE);
     }
+    std::cout << "debug compute_surface_dT 3\n";
     Kokkos::parallel_for(
         "ComputeSurfaceDT_Left",
         Kokkos::Experimental::require(
-            policy_left_t(E_left, {0, 0}, {Y, Z}),
-            Kokkos::Experimental::WorkItemProperty::HintLightWeight), *this);
+          policy_left_t(E_left, {0, 0}, {Y, Z}),
+          Kokkos::Experimental::WorkItemProperty::HintLightWeight), *this);
+    std::cout << "debug compute_surface_dT 4\n";
     Kokkos::parallel_for(
         "ComputeSurfaceDT_Right",
         Kokkos::Experimental::require(
             policy_right_t(E_right, {0, 0}, {Y, Z}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight), *this);
+    std::cout << "debug compute_surface_dT 5\n";
     Kokkos::parallel_for(
         "ComputeSurfaceDT_Down",
         Kokkos::Experimental::require(
             policy_down_t(E_down, {1, 0}, {X - 1, Z}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight), *this);
+    std::cout << "debug compute_surface_dT 6\n";
     Kokkos::parallel_for(
         "ComputeSurfaceDT_Up",
         Kokkos::Experimental::require(
             policy_up_t(E_up, {1, 0}, {X - 1, Z}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight), *this);
+    std::cout << "debug compute_surface_dT 7\n";
     Kokkos::parallel_for(
         "ComputeSurfaceDT_front",
         Kokkos::Experimental::require(
             policy_front_t(E_front, {1, 1}, {X - 1, Y - 1}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight), *this);
+    std::cout << "debug compute_surface_dT 8\n";
     Kokkos::parallel_for(
         "ComputeSurfaceDT_back",
         Kokkos::Experimental::require(
             policy_back_t(E_back, {1, 1}, {X - 1, Y - 1}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight), *this);
+    std::cout << "debug compute_surface_dT 9\n";
   }
 
   // Some compilers have deduction issues if this were just a tagged operator, so a full Functor here instead
@@ -429,12 +495,15 @@ struct System {
   }
 };
 
-void benchmark_heat3d(benchmark::State &state) {
+void benchmark_heat3d_mpi(benchmark::State &state) {
   auto start = std::chrono::high_resolution_clock::now();
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
+  std::cout << "debug main 1\n";
   sys.timestep();
+  std::cout << "debug main 2\n";
   sys.destroy_exec_spaces();
+  std::cout << "debug main 3\n";
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds =
       std::chrono::duration_cast<std::chrono::duration<double>>(
@@ -444,6 +513,25 @@ void benchmark_heat3d(benchmark::State &state) {
   if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
     state.SkipWithMessage("Loop exited prematurely!");
   }
+  std::cout << "debug main 4\n";
 }
 
-BENCHMARK(benchmark_heat3d)->UseManualTime()->Unit(benchmark::kMillisecond);
+// void benchmark_heat3d_kc(benchmark::State &state) {
+//   auto start = std::chrono::high_resolution_clock::now();
+//   System sys(MPI_COMM_WORLD);
+//   sys.setup_subdomain();
+//   sys.timestep();
+//   sys.destroy_exec_spaces();
+//   auto end = std::chrono::high_resolution_clock::now();
+//   auto elapsed_seconds =
+//       std::chrono::duration_cast<std::chrono::duration<double>>(
+//         end - start);
+//   std::cout << "elapsed_seconds = " << elapsed_seconds << '\n';
+//   state.SetIterationTime(elapsed_seconds.count());
+//   if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
+//     state.SkipWithMessage("Loop exited prematurely!");
+//   }
+// }
+
+BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMillisecond);
+// BENCHMARK(benchmark_heat3d_kc)->UseManualTime()->Unit(benchmark::kMillisecond);
