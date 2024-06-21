@@ -1,4 +1,3 @@
-#include <Kokkos_Core.hpp>
 #include "KokkosComm.hpp"
 #include "test_utils.hpp"
 #include <iostream>
@@ -68,17 +67,17 @@ struct CommHelper {
 
   template <class ViewType>
   void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer,
-                   MPI_Request* request_send, MPI_Request* request_recv) {
-    MPI_Irecv(recv_buffer.data(), recv_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_recv);
-    MPI_Isend(send_buffer.data(), send_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_send);
+                   MPI_Request* request_send, MPI_Request* request_recv) {  //TODO KOKKOSCOMM
+    MPI_Irecv(recv_buffer.data(), recv_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_recv); //TODO KOKKOSCOMM
+    MPI_Isend(send_buffer.data(), send_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_send); //TODO KOKKOSCOMM
   }
 };
 
 struct System {
   // Communicator
   CommHelper comm;
-  MPI_Request mpi_requests_recv[6];
-  MPI_Request mpi_requests_send[6];
+  MPI_Request mpi_requests_recv[6];  //TODO KOKKOSCOMM
+  MPI_Request mpi_requests_send[6];  //TODO KOKKOSCOMM
   int mpi_active_requests;
 
   // size of system
@@ -151,7 +150,7 @@ struct System {
     if (Z_hi > Z) Z_hi = Z;
     T  = Kokkos::View<double***>("System::T", X_hi - X_lo, Y_hi - Y_lo, Z_hi - Z_lo);
     dT = Kokkos::View<double***>("System::dT", T.extent(0), T.extent(1), T.extent(2));
-    Kokkos::deep_copy(T, T0);
+    Kokkos::deep_copy(T, T0); //TODO KOKKOSCOMM
 
     // incoming halos
     if (X_lo != 0) T_left = buffer_t("System::T_left", Y_hi - Y_lo, Z_hi - Z_lo);
@@ -170,7 +169,7 @@ struct System {
   }
 
   // run_time_loops
-  void timestep() {
+  void timestep(bool kc) {
     Kokkos::Timer timer;
     double old_time = 0.0; double time_all = 0.0;
     double GUPs     = 0.0;
@@ -185,7 +184,7 @@ struct System {
       Kokkos::fence();
       time_b = timer.seconds();
       exchange_T_halo();
-      compute_surface_dT();
+      compute_surface_dT(kc);
       Kokkos::fence();
       time_c       = timer.seconds();
       double T_ave = update_T();
@@ -287,7 +286,7 @@ struct System {
     dT(x, y, z) = dT_xyz;
   }
 
-  void pack_T_halo() {
+  void pack_T_halo() { //TODO KOKKOSCOMM
     mpi_active_requests = 0;
     int mar             = 0;
     if (X_lo != 0) {
@@ -351,7 +350,7 @@ struct System {
     mpi_active_requests = mar;
   }
 
-  void compute_surface_dT() {
+  void compute_surface_dT(bool kc) {
     using policy_left_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<left>, int>;
     using policy_right_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<right>, int>;
     using policy_down_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<down>, int>;
@@ -359,10 +358,18 @@ struct System {
     using policy_front_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<front>, int>;
     using policy_back_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<back>, int>;
     int x = T.extent(0); int y = T.extent(1); int z = T.extent(2);
-    if (mpi_active_requests > 0) {
-      MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE);
-      MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE);
+    if(!kc){
+      if (mpi_active_requests > 0) {
+        MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE);
+        MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE);
+      }
+    } else {
+      if (mpi_active_requests > 0) {
+        MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
+        MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
+      }
     }
+    
     Kokkos::parallel_for(
       "ComputeSurfaceDT_Left",
       Kokkos::Experimental::require(
@@ -425,16 +432,35 @@ struct System {
 };
 
 void benchmark_heat3d_mpi(benchmark::State &state) {
+  bool kc = false;
   auto start = std::chrono::high_resolution_clock::now();
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
-  sys.timestep();
+  sys.timestep(kc);
   sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds =
       std::chrono::duration_cast<std::chrono::duration<double>>(
         end - start);
-  std::cout << "elapsed_seconds = " << elapsed_seconds << '\n';
+  std::cout << "mpi_elapsed_seconds = " << elapsed_seconds << '\n';
+  state.SetIterationTime(elapsed_seconds.count());
+  if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
+    state.SkipWithMessage("Loop exited prematurely!");
+  }
+}
+
+void benchmark_heat3d_kc(benchmark::State &state) {
+  bool kc = true;
+  auto start = std::chrono::high_resolution_clock::now();
+  // System sys(MPI_COMM_WORLD);
+  // sys.setup_subdomain();
+  // sys.timestep(kc);
+  // sys.destroy_exec_spaces();
+  auto end = std::chrono::high_resolution_clock::now();
+  auto elapsed_seconds =
+      std::chrono::duration_cast<std::chrono::duration<double>>(
+        end - start);
+  std::cout << "kc_elapsed_seconds = " << elapsed_seconds << '\n';
   state.SetIterationTime(elapsed_seconds.count());
   if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
     state.SkipWithMessage("Loop exited prematurely!");
@@ -442,3 +468,4 @@ void benchmark_heat3d_mpi(benchmark::State &state) {
 }
 
 BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(benchmark_heat3d_kc)->UseManualTime()->Unit(benchmark::kMillisecond);
