@@ -410,12 +410,12 @@ struct System {
 
   double update_T() {
     using policy_t = Kokkos::MDRangePolicy<Kokkos::Rank<3>, Kokkos::IndexType<int>>;
-    X = T.extent(0); Y = T.extent(1); Z = T.extent(2); //TODO is this okay?
+    int x = T.extent(0); int y = T.extent(1); int z = T.extent(2);
     double my_T = 0.0;
     Kokkos::parallel_reduce(
         "UpdateT",
         Kokkos::Experimental::require(
-            policy_t(E_bulk, {0, 0, 0}, {X, Y, Z}, {10, 10, 10}),
+            policy_t(E_bulk, {0, 0, 0}, {x, y, z}, {10, 10, 10}),
             Kokkos::Experimental::WorkItemProperty::HintLightWeight),
         UpdateT(T, dT, dt), my_T);
     double sum_T;
