@@ -442,7 +442,7 @@ void benchmark_heat3d(benchmark::State &state) {
   std::cout << "elapsed_seconds = " << elapsed_seconds << '\n';
   state.SetIterationTime(elapsed_seconds.count());
   if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
-    state.SkipWithError("Loop exited prematurely!");
+    state.SkipWithMessage("Loop exited prematurely!");
   }
 }
 
