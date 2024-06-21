@@ -275,10 +275,8 @@ struct System {
           old_time = time;
         }
       }
-      std::cout << "debug 1: for (int t = 0; t <= N; t++) { \n";
-      std::cout << "t = " << t << " N = " << N << '\n';
+      std::cout << "debug: t = " << t << " N = " << N << '\n';
     }
-    std::cout << "debug 2\n";
   }
 
   // Compute inner update
@@ -561,12 +559,18 @@ struct System {
 };
 
 void benchmark_heat3d(benchmark::State &state) {
+  auto start = std::chrono::high_resolution_clock::now();
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
   sys.timestep();
-  std::cout << "debug 3\n";
   sys.destroy_exec_spaces();
-  std::cout << "debug 4\n";
+  auto end = std::chrono::high_resolution_clock::now();
+  auto elapsed_seconds =
+      std::chrono::duration_cast<std::chrono::duration<double>>(
+        end - start);
+  std::cout << "elapsed_seconds = " << elapsed_seconds << '\n';
+  std::cout << "st.iterations() = " << state.iterations() << " st.max_iterations = " << state.max_iterations << '\n';
+  state.SetIterationTime(elapsed_seconds.count());
 }
 
 BENCHMARK(benchmark_heat3d)->UseManualTime()->Unit(benchmark::kMillisecond);
