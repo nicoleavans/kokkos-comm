@@ -40,6 +40,7 @@ struct SpaceInstance<Kokkos::Cuda> {
 
 struct CommHelper {
   MPI_Comm comm;
+  testState test;
 
   int nx, ny, nz; // Num MPI ranks in each dimension
   int me;         // My rank
@@ -49,8 +50,9 @@ struct CommHelper {
   // Neighbor Ranks
   int up, down, left, right, front, back;
 
-  CommHelper(MPI_Comm comm_) {
+  CommHelper(MPI_Comm comm_, testState test_) {
     comm = comm_;
+    test = test_;
     MPI_Comm_size(comm, &nranks);
     MPI_Comm_rank(comm, &me);
 
@@ -72,18 +74,29 @@ struct CommHelper {
   }
 
   template <class ViewType>
-  void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer,
-                   MPI_Request* request_send, MPI_Request* request_recv) {  //TODO KOKKOSCOMM
-    MPI_Irecv(recv_buffer.data(), recv_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_recv); //TODO KOKKOSCOMM
-    MPI_Isend(send_buffer.data(), send_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_send); //TODO KOKKOSCOMM
+  void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer, //TODO KOKKOSCOMM
+                    MPI_Request* request_send, MPI_Request* request_recv) { 
+    MPI_Irecv(recv_buffer.data(), recv_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_recv);
+    MPI_Isend(send_buffer.data(), send_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_send);
   }
+
+  // template <class ViewType>
+  // void isend_irecv(const ViewType &sv, ViewType &rv, int src, int dest, int tag, MPI_Request &recvreq){ 
+  //   KokkosComm::Req sendreq = KokkosComm::isend(space, sv, dest, tag, comm);
+  //   sendreq.wait();
+  //   KokkosComm::irecv(rv, src, tag, comm, &recvreq);
+  //   MPI_Wait(&recvreq, MPI_STATUS_IGNORE); //TODO could this be KokkosComm::Req::wait()?
+  // }
 };
 
 struct System {
   // Communicator
   CommHelper comm;
-  MPI_Request mpi_requests_recv[6];  //TODO KOKKOSCOMM
-  MPI_Request mpi_requests_send[6];  //TODO KOKKOSCOMM
+  testState test;
+  MPI_Request mpi_requests_recv[6];
+  MPI_Request mpi_requests_send[6];
+  // KokkosComm::Req mpi_requests_recv[6]; //TODO should this be done?
+  // KokkosComm::Req mpi_requests_send[6]; //TODO no ifs in structs
   int mpi_active_requests;
 
   // size of system
@@ -111,7 +124,7 @@ struct System {
   double P;     // incoming power
 
   // init_system
-  System(MPI_Comm comm_) : comm(comm_) {
+  System(MPI_Comm comm_, testState test_) : comm(comm_, test_) {
     mpi_active_requests = 0;
     X = Y = Z = 200;
     X_lo = Y_lo = Z_lo = 0;
@@ -156,7 +169,13 @@ struct System {
     if (Z_hi > Z) Z_hi = Z;
     T  = Kokkos::View<double***>("System::T", X_hi - X_lo, Y_hi - Y_lo, Z_hi - Z_lo);
     dT = Kokkos::View<double***>("System::dT", T.extent(0), T.extent(1), T.extent(2));
-    Kokkos::deep_copy(T, T0); //TODO KOKKOSCOMM
+    if(comm.test == MPI){
+      Kokkos::deep_copy(T, T0);
+    } else if(comm.test == KC_PACK){
+      Kokkos::deep_copy(T, T0); //TODO KOKKOSCOMM
+    } else if (comm.test == KC_DATATYPE){
+      Kokkos::deep_copy(T, T0); //TODO KOKKOSCOMM
+    }
 
     // incoming halos
     if (X_lo != 0) T_left = buffer_t("System::T_left", Y_hi - Y_lo, Z_hi - Z_lo);
@@ -175,7 +194,7 @@ struct System {
   }
 
   // run_time_loops
-  void timestep(testState value) {
+  void timestep() {
     Kokkos::Timer timer;
     double old_time = 0.0; double time_all = 0.0;
     double GUPs     = 0.0;
@@ -190,7 +209,7 @@ struct System {
       Kokkos::fence();
       time_b = timer.seconds();
       exchange_T_halo();
-      compute_surface_dT(value);
+      compute_surface_dT();
       Kokkos::fence();
       time_c       = timer.seconds();
       double T_ave = update_T();
@@ -292,32 +311,88 @@ struct System {
     dT(x, y, z) = dT_xyz;
   }
 
-  void pack_T_halo() { //TODO KOKKOSCOMM
-    mpi_active_requests = 0;
-    int mar             = 0;
-    if (X_lo != 0) {
-      Kokkos::deep_copy(E_left, T_left_out, Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL));
-      mar++;
-    }
-    if (Y_lo != 0) {
-      Kokkos::deep_copy(E_down, T_down_out, Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL));
-      mar++;
-    }
-    if (Z_lo != 0) {
-      Kokkos::deep_copy(E_front, T_front_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0));
-      mar++;
-    }
-    if (X_hi != X) {
-      Kokkos::deep_copy(E_right, T_right_out, Kokkos::subview(T, X_hi - X_lo - 1, Kokkos::ALL, Kokkos::ALL));
-      mar++;
-    }
-    if (Y_hi != Y) {
-      Kokkos::deep_copy(E_up, T_up_out, Kokkos::subview(T, Kokkos::ALL, Y_hi - Y_lo - 1, Kokkos::ALL));
-      mar++;
-    }
-    if (Z_hi != Z) {
-      Kokkos::deep_copy(E_back, T_back_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, Z_hi - Z_lo - 1));
-      mar++;
+  void pack_T_halo() {
+    if(comm.test == MPI){
+      mpi_active_requests = 0;
+      int mar             = 0;
+      if (X_lo != 0) {
+        Kokkos::deep_copy(E_left, T_left_out, Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL));
+        mar++;
+      }
+      if (Y_lo != 0) {
+        Kokkos::deep_copy(E_down, T_down_out, Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL));
+        mar++;
+      }
+      if (Z_lo != 0) {
+        Kokkos::deep_copy(E_front, T_front_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0));
+        mar++;
+      }
+      if (X_hi != X) {
+        Kokkos::deep_copy(E_right, T_right_out, Kokkos::subview(T, X_hi - X_lo - 1, Kokkos::ALL, Kokkos::ALL));
+        mar++;
+      }
+      if (Y_hi != Y) {
+        Kokkos::deep_copy(E_up, T_up_out, Kokkos::subview(T, Kokkos::ALL, Y_hi - Y_lo - 1, Kokkos::ALL));
+        mar++;
+      }
+      if (Z_hi != Z) {
+        Kokkos::deep_copy(E_back, T_back_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, Z_hi - Z_lo - 1));
+        mar++;
+      }
+    } else if(comm.test == KC_PACK) { //TODO KOKKOSCOMM
+      mpi_active_requests = 0;
+      int mar             = 0;
+      if (X_lo != 0) {
+        Kokkos::deep_copy(E_left, T_left_out, Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL));
+        mar++;
+      }
+      if (Y_lo != 0) {
+        Kokkos::deep_copy(E_down, T_down_out, Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL));
+        mar++;
+      }
+      if (Z_lo != 0) {
+        Kokkos::deep_copy(E_front, T_front_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0));
+        mar++;
+      }
+      if (X_hi != X) {
+        Kokkos::deep_copy(E_right, T_right_out, Kokkos::subview(T, X_hi - X_lo - 1, Kokkos::ALL, Kokkos::ALL));
+        mar++;
+      }
+      if (Y_hi != Y) {
+        Kokkos::deep_copy(E_up, T_up_out, Kokkos::subview(T, Kokkos::ALL, Y_hi - Y_lo - 1, Kokkos::ALL));
+        mar++;
+      }
+      if (Z_hi != Z) {
+        Kokkos::deep_copy(E_back, T_back_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, Z_hi - Z_lo - 1));
+        mar++;
+      }
+    } else if(comm.test == KC_DATATYPE) { //TODO KOKKOSCOMM
+      mpi_active_requests = 0;
+      int mar             = 0;
+      if (X_lo != 0) {
+        Kokkos::deep_copy(E_left, T_left_out, Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL));
+        mar++;
+      }
+      if (Y_lo != 0) {
+        Kokkos::deep_copy(E_down, T_down_out, Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL));
+        mar++;
+      }
+      if (Z_lo != 0) {
+        Kokkos::deep_copy(E_front, T_front_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0));
+        mar++;
+      }
+      if (X_hi != X) {
+        Kokkos::deep_copy(E_right, T_right_out, Kokkos::subview(T, X_hi - X_lo - 1, Kokkos::ALL, Kokkos::ALL));
+        mar++;
+      }
+      if (Y_hi != Y) {
+        Kokkos::deep_copy(E_up, T_up_out, Kokkos::subview(T, Kokkos::ALL, Y_hi - Y_lo - 1, Kokkos::ALL));
+        mar++;
+      }
+      if (Z_hi != Z) {
+        Kokkos::deep_copy(E_back, T_back_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, Z_hi - Z_lo - 1));
+        mar++;
+      }
     }
   }
 
@@ -325,38 +400,87 @@ struct System {
     int mar = 0;
     if (X_lo != 0) {
       E_left.fence();
-      comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-      mar++;
+      if(comm.test == MPI){
+        comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++;
+      } else if(comm.test == KC_PACK){
+        comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        // comm.isend_irecv(T_left_out, T_left, comm.left, MPI_ANY_TAG, comm);
+        mar++; //TODO KOKKOSCOMM
+      } else if(comm.test == KC_DATATYPE){
+        comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      }
     }
     if (Y_lo != 0) {
       E_down.fence();
-      comm.isend_irecv(comm.down, T_down_out, T_down, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-      mar++;
+      if(comm.test == MPI){
+        comm.isend_irecv(comm.down, T_down_out, T_down, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++;
+      } else if(comm.test == KC_PACK){
+        comm.isend_irecv(comm.down, T_down_out, T_down, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      } else if(comm.test == KC_DATATYPE){
+        comm.isend_irecv(comm.down, T_down_out, T_down, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      }
     }
     if (Z_lo != 0) {
       E_front.fence();
-      comm.isend_irecv(comm.front, T_front_out, T_front, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-      mar++;
+      if(comm.test == MPI){
+        comm.isend_irecv(comm.front, T_front_out, T_front, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++;
+      } else if(comm.test == KC_PACK){
+        comm.isend_irecv(comm.front, T_front_out, T_front, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      } else if(comm.test == KC_DATATYPE){
+        comm.isend_irecv(comm.front, T_front_out, T_front, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      }
     }
     if (X_hi != X) {
       E_right.fence();
-      comm.isend_irecv(comm.right, T_right_out, T_right, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-      mar++;
+      if(comm.test == MPI){
+        comm.isend_irecv(comm.right, T_right_out, T_right, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++;
+      } else if(comm.test == KC_PACK){
+        comm.isend_irecv(comm.right, T_right_out, T_right, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      } else if(comm.test == KC_DATATYPE){
+        comm.isend_irecv(comm.right, T_right_out, T_right, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      }
     }
     if (Y_hi != Y) {
       E_up.fence();
-      comm.isend_irecv(comm.up, T_up_out, T_up, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-      mar++;
+      if(comm.test == MPI){
+        comm.isend_irecv(comm.up, T_up_out, T_up, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++;
+      } else if(comm.test == KC_PACK){
+        comm.isend_irecv(comm.up, T_up_out, T_up, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      } else if(comm.test == KC_DATATYPE){
+        comm.isend_irecv(comm.up, T_up_out, T_up, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      }
     }
     if (Z_hi != Z) {
       E_back.fence();
-      comm.isend_irecv(comm.back, T_back_out, T_back, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-      mar++;
+      if(comm.test == MPI){
+        comm.isend_irecv(comm.back, T_back_out, T_back, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++;
+      } else if(comm.test == KC_PACK){
+        comm.isend_irecv(comm.back, T_back_out, T_back, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      } else if(comm.test == KC_DATATYPE){
+        comm.isend_irecv(comm.back, T_back_out, T_back, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
+        mar++; //TODO KOKKOSCOMM
+      }
     }
     mpi_active_requests = mar;
   }
 
-  void compute_surface_dT(testState value) {
+  void compute_surface_dT() {
     using policy_left_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<left>, int>;
     using policy_right_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<right>, int>;
     using policy_down_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<down>, int>;
@@ -364,17 +488,17 @@ struct System {
     using policy_front_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<front>, int>;
     using policy_back_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<back>, int>;
     int x = T.extent(0); int y = T.extent(1); int z = T.extent(2);
-    if(value == MPI){
+    if(comm.test == MPI){
       if (mpi_active_requests > 0) {
         MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE);
         MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE);
       }
-    } else if (value == KC_PACK) {
+    } else if (comm.test == KC_PACK) {
       if (mpi_active_requests > 0) {
         MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
         MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
       }
-    } else if (value = KC_DATATYPE) {
+    } else if (comm.test = KC_DATATYPE) {
       if (mpi_active_requests > 0) {
         MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
         MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
@@ -443,11 +567,11 @@ struct System {
 };
 
 void benchmark_heat3d_mpi(benchmark::State &state) {
-  testState value = MPI;
+  testState test = MPI;
   auto start = std::chrono::high_resolution_clock::now();
-  System sys(MPI_COMM_WORLD);
+  System sys(MPI_COMM_WORLD, test);
   sys.setup_subdomain();
-  sys.timestep(value);
+  sys.timestep();
   sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
@@ -459,12 +583,12 @@ void benchmark_heat3d_mpi(benchmark::State &state) {
 }
 
 void benchmark_heat3d_kc_pack(benchmark::State &state) {
-  testState value = KC_PACK;
+  testState test = KC_PACK;
   auto start = std::chrono::high_resolution_clock::now();
-  // System sys(MPI_COMM_WORLD);
-  // sys.setup_subdomain();
-  // sys.timestep(value);
-  // sys.destroy_exec_spaces();
+  System sys(MPI_COMM_WORLD, test);
+  sys.setup_subdomain();
+  sys.timestep();
+  sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
   std::cout << "kc_elapsed_seconds = " << elapsed_seconds << '\n';
@@ -475,12 +599,12 @@ void benchmark_heat3d_kc_pack(benchmark::State &state) {
 }
 
 void benchmark_heat3d_kc_datatype(benchmark::State &state) {
-  testState value = KC_DATATYPE;
+  testState test = KC_DATATYPE;
   auto start = std::chrono::high_resolution_clock::now();
-  // System sys(MPI_COMM_WORLD);
-  // sys.setup_subdomain();
-  // sys.timestep(value);
-  // sys.destroy_exec_spaces();
+  System sys(MPI_COMM_WORLD, test);
+  sys.setup_subdomain();
+  sys.timestep();
+  sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
   std::cout << "kc_elapsed_seconds = " << elapsed_seconds << '\n';
