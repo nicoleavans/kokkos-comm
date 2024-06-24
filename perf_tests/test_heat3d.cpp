@@ -2,6 +2,12 @@
 #include "test_utils.hpp"
 #include <iostream>
 
+enum testState {
+  MPI,
+  KC_PACK,
+  KC_DATATYPE
+};
+
 template <class ExecSpace>
 struct SpaceInstance {
   static ExecSpace create() { return ExecSpace(); }
@@ -169,7 +175,7 @@ struct System {
   }
 
   // run_time_loops
-  void timestep(bool kc) {
+  void timestep(testState value) {
     Kokkos::Timer timer;
     double old_time = 0.0; double time_all = 0.0;
     double GUPs     = 0.0;
@@ -184,7 +190,7 @@ struct System {
       Kokkos::fence();
       time_b = timer.seconds();
       exchange_T_halo();
-      compute_surface_dT(kc);
+      compute_surface_dT(value);
       Kokkos::fence();
       time_c       = timer.seconds();
       double T_ave = update_T();
@@ -350,7 +356,7 @@ struct System {
     mpi_active_requests = mar;
   }
 
-  void compute_surface_dT(bool kc) {
+  void compute_surface_dT(testState value) {
     using policy_left_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<left>, int>;
     using policy_right_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<right>, int>;
     using policy_down_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<down>, int>;
@@ -358,12 +364,17 @@ struct System {
     using policy_front_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<front>, int>;
     using policy_back_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<back>, int>;
     int x = T.extent(0); int y = T.extent(1); int z = T.extent(2);
-    if(!kc){
+    if(value == MPI){
       if (mpi_active_requests > 0) {
         MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE);
         MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE);
       }
-    } else {
+    } else if (value == KC_PACK) {
+      if (mpi_active_requests > 0) {
+        MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
+        MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
+      }
+    } else if (value = KC_DATATYPE) {
       if (mpi_active_requests > 0) {
         MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
         MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
@@ -432,11 +443,11 @@ struct System {
 };
 
 void benchmark_heat3d_mpi(benchmark::State &state) {
-  bool kc = false; //TODO change from bool since we need three options
+  testState value = MPI;
   auto start = std::chrono::high_resolution_clock::now();
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
-  sys.timestep(kc);
+  sys.timestep(value);
   sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
@@ -447,12 +458,12 @@ void benchmark_heat3d_mpi(benchmark::State &state) {
   }
 }
 
-void benchmark_heat3d_kc_repack(benchmark::State &state) {
-  bool kc = true; //TODO change from bool since we need three options
+void benchmark_heat3d_kc_pack(benchmark::State &state) {
+  testState value = KC_PACK;
   auto start = std::chrono::high_resolution_clock::now();
   // System sys(MPI_COMM_WORLD);
   // sys.setup_subdomain();
-  // sys.timestep(kc);
+  // sys.timestep(value);
   // sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
@@ -464,11 +475,11 @@ void benchmark_heat3d_kc_repack(benchmark::State &state) {
 }
 
 void benchmark_heat3d_kc_datatype(benchmark::State &state) {
-  bool kc = true; //TODO change from bool since we need three options
+  testState value = KC_DATATYPE;
   auto start = std::chrono::high_resolution_clock::now();
   // System sys(MPI_COMM_WORLD);
   // sys.setup_subdomain();
-  // sys.timestep(kc);
+  // sys.timestep(value);
   // sys.destroy_exec_spaces();
   auto end = std::chrono::high_resolution_clock::now();
   auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
@@ -480,5 +491,5 @@ void benchmark_heat3d_kc_datatype(benchmark::State &state) {
 }
 
 BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMillisecond);
-BENCHMARK(benchmark_heat3d_kc_repack)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(benchmark_heat3d_kc_pack)->UseManualTime()->Unit(benchmark::kMillisecond);
 BENCHMARK(benchmark_heat3d_kc_datatype)->UseManualTime()->Unit(benchmark::kMillisecond);
