@@ -74,19 +74,19 @@ struct CommHelper {
   }
 
   template <class ViewType>
-  void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer, //TODO KOKKOSCOMM
+  void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer,
                     MPI_Request* request_send, MPI_Request* request_recv) { 
     MPI_Irecv(recv_buffer.data(), recv_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_recv);
     MPI_Isend(send_buffer.data(), send_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_send);
   }
 
-  // template <class ViewType>
-  // void isend_irecv(const ViewType &sv, ViewType &rv, int src, int dest, int tag, MPI_Request &recvreq){ 
-  //   KokkosComm::Req sendreq = KokkosComm::isend(space, sv, dest, tag, comm);
-  //   sendreq.wait();
-  //   KokkosComm::irecv(rv, src, tag, comm, &recvreq);
-  //   MPI_Wait(&recvreq, MPI_STATUS_IGNORE); //TODO could this be KokkosComm::Req::wait()?
-  // }
+  template <typename Space, class ViewType> //TODO KOKKOSCOMM 
+  void isend_irecv(const Space &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, MPI_Request &recvreq){ 
+    KokkosComm::Req sendreq = KokkosComm::isend(space, sv, dest, tag, comm);
+    KokkosComm::irecv(rv, src, tag, comm, &recvreq);
+    sendreq.wait();
+    MPI_Wait(&recvreq, MPI_STATUS_IGNORE); //TODO could this be KokkosComm::Req::wait()?
+  }
 };
 
 struct System {
@@ -96,7 +96,7 @@ struct System {
   MPI_Request mpi_requests_recv[6];
   MPI_Request mpi_requests_send[6];
   // KokkosComm::Req mpi_requests_recv[6]; //TODO should this be done?
-  // KokkosComm::Req mpi_requests_send[6]; //TODO no ifs in structs
+  // KokkosComm::Req mpi_requests_send[6]; //TODO no ifs in structs make decision elsewhere
   int mpi_active_requests;
 
   // size of system
@@ -172,9 +172,11 @@ struct System {
     if(comm.test == MPI){
       Kokkos::deep_copy(T, T0);
     } else if(comm.test == KC_PACK){
-      Kokkos::deep_copy(T, T0); //TODO KOKKOSCOMM
+      Kokkos::deep_copy(T, T0);
+      // KokkosComm::Impl::Packer::DeepCopy::pack(T, T0); don't mess with Packer don't modify
     } else if (comm.test == KC_DATATYPE){
-      Kokkos::deep_copy(T, T0); //TODO KOKKOSCOMM
+      Kokkos::deep_copy(T, T0);
+      //TODO KokkosComm::Impl::Packer::DeepCopy(T, T0); 
     }
 
     // incoming halos
@@ -405,7 +407,8 @@ struct System {
         mar++;
       } else if(comm.test == KC_PACK){
         comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-        // comm.isend_irecv(T_left_out, T_left, comm.left, MPI_ANY_TAG, comm);
+        // void isend_irecv(const Space &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, MPI_Request &recvreq){ 
+        // comm.isend_irecv(Kokkos::DefaultExecutionSpace, T_left_out, T_left, );
         mar++; //TODO KOKKOSCOMM
       } else if(comm.test == KC_DATATYPE){
         comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
@@ -495,13 +498,13 @@ struct System {
       }
     } else if (comm.test == KC_PACK) {
       if (mpi_active_requests > 0) {
-        MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
-        MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
+        MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM? for all mpi wait
+        MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM?
       }
     } else if (comm.test = KC_DATATYPE) {
       if (mpi_active_requests > 0) {
-        MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
-        MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM
+        MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM?
+        MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE); //TODO KOKKOSCOMM?
       }
     }
     
