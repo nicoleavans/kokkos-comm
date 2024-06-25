@@ -517,13 +517,20 @@ struct SystemKC {
     if (Y_hi != Y) T_up = buffer_t("System::T_up", X_hi - X_lo, Z_hi - Z_lo);
     if (Z_lo != 0) T_front = buffer_t("System::T_front", X_hi - X_lo, Y_hi - Y_lo);
     if (Z_hi != Z) T_back = buffer_t("System::T_back", X_hi - X_lo, Y_hi - Y_lo);
+    // if (X_lo != 0) auto T_left = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    // if (X_hi != X) auto T_right = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    // if (Y_lo != 0) auto T_down = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    // if (Y_hi != Y) auto T_up = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    // if (Z_lo != 0) auto T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    // if (Z_hi != Z) auto T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+
     // outgoing halo
-    if (X_lo != 0) auto T_left_out = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
-    if (X_hi != X) auto T_right_out = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) auto T_down_out = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
-    if (Y_hi != Y) auto T_up_out = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
-    if (Z_lo != 0) auto T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
-    if (Z_hi != Z) auto T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
+    if (X_lo != 0) auto T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (X_hi != X) auto T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (Y_lo != 0) auto T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Y_hi != Y) auto T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Z_lo != 0) auto T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (Z_hi != Z) auto T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
   }
 
   // run_time_loops
