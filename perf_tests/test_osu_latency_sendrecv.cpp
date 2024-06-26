@@ -22,58 +22,68 @@
 #include "KokkosComm.hpp"
 
 template <typename Space, typename View>
-void osu_latency_Kokkos_Comm_sendrecv(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
-    if(rank == 0){
-        KokkosComm::send(space, v, 1, 0, comm);
-    } else if (rank == 1){
-        KokkosComm::recv(space, v, 0, 0, comm);
-    }
+void osu_latency_Kokkos_Comm_sendrecv(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
+  if (rank == 0) {
+    KokkosComm::send(space, v, 1, 0, comm);
+  } else if (rank == 1) {
+    KokkosComm::recv(space, v, 0, 0, comm);
+  }
 }
 
 template <typename View>
-void osu_latency_MPI_sendrecv(benchmark::State &, MPI_Comm comm, int rank, const View &v){
-    MPI_Barrier(comm);
-    if(rank == 0){
-        MPI_Recv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, MPI_STATUS_IGNORE);
-    } else if (rank == 1){
-        MPI_Send(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm);
-    }
+void osu_latency_MPI_sendrecv(benchmark::State &, MPI_Comm comm, int rank, const View &v) {
+  MPI_Barrier(comm);
+  if (rank == 0) {
+    MPI_Recv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm,
+             MPI_STATUS_IGNORE);
+  } else if (rank == 1) {
+    MPI_Send(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm);
+  }
 }
 
-void benchmark_osu_latency_KokkosComm_sendrecv(benchmark::State &state){
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if(size != 2){
-        state.SkipWithError("benchmark_osu_latency_KokkosComm needs exactly 2 ranks");
-    }
+void benchmark_osu_latency_KokkosComm_sendrecv(benchmark::State &state) {
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (size != 2) {
+    state.SkipWithError("benchmark_osu_latency_KokkosComm needs exactly 2 ranks");
+  }
 
-    auto space = Kokkos::DefaultExecutionSpace();
-    using view_type = Kokkos::View<char *>;
-    view_type a("", state.range(0));
+  auto space      = Kokkos::DefaultExecutionSpace();
+  using view_type = Kokkos::View<char *>;
+  view_type a("", state.range(0));
 
-    while(state.KeepRunning()){
-        do_iteration(state, MPI_COMM_WORLD, osu_latency_Kokkos_Comm_sendrecv<Kokkos::DefaultExecutionSpace, view_type>, space, rank, a);
-    }
-    state.counters["bytes"] = a.size() * 2;
+  while (state.KeepRunning()) {
+    do_iteration(state, MPI_COMM_WORLD, osu_latency_Kokkos_Comm_sendrecv<Kokkos::DefaultExecutionSpace, view_type>,
+                 space, rank, a);
+  }
+  state.counters["bytes"] = a.size() * 2;
 }
 
-void benchmark_osu_latency_MPI_sendrecv(benchmark::State &state){
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if(size != 2){
-        state.SkipWithError("benchmark_osu_latency_MPI needs exactly 2 ranks");
-    }
+void benchmark_osu_latency_MPI_sendrecv(benchmark::State &state) {
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (size != 2) {
+    state.SkipWithError("benchmark_osu_latency_MPI needs exactly 2 ranks");
+  }
 
-    using view_type = Kokkos::View<char *>;
-    view_type a("", state.range(0));
+  using view_type = Kokkos::View<char *>;
+  view_type a("", state.range(0));
 
-    while(state.KeepRunning()){
-        do_iteration(state, MPI_COMM_WORLD, osu_latency_MPI_sendrecv<view_type>, rank, a);
-    }
-    state.counters["bytes"] = a.size() * 2;
+  while (state.KeepRunning()) {
+    do_iteration(state, MPI_COMM_WORLD, osu_latency_MPI_sendrecv<view_type>, rank, a);
+  }
+  state.counters["bytes"] = a.size() * 2;
 }
 
-BENCHMARK(benchmark_osu_latency_KokkosComm_sendrecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
-BENCHMARK(benchmark_osu_latency_MPI_sendrecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
+BENCHMARK(benchmark_osu_latency_KokkosComm_sendrecv)
+    ->UseManualTime()
+    ->Unit(benchmark::kMicrosecond)
+    ->RangeMultiplier(2)
+    ->Range(1, 32 * 1024 * 1024);
+BENCHMARK(benchmark_osu_latency_MPI_sendrecv)
+    ->UseManualTime()
+    ->Unit(benchmark::kMicrosecond)
+    ->RangeMultiplier(2)
+    ->Range(1, 32 * 1024 * 1024);

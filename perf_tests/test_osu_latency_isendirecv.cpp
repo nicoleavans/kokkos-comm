@@ -22,67 +22,78 @@
 #include "KokkosComm.hpp"
 
 template <typename Space, typename View>
-void osu_latency_Kokkos_Comm_isendirecv(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v){
-    if(rank == 0){
-        KokkosComm::Req sendreq = KokkosComm::isend(space, v, 1, 1, comm);
-        sendreq.wait();
-    } else if (rank == 1){
-        MPI_Request recvreq;
-        MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 1, comm, &recvreq);
-        MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
-    }
- }
+void osu_latency_Kokkos_Comm_isendirecv(benchmark::State &, MPI_Comm comm, const Space &space, int rank,
+                                        const View &v) {
+  if (rank == 0) {
+    KokkosComm::Req sendreq = KokkosComm::isend(space, v, 1, 1, comm);
+    sendreq.wait();
+  } else if (rank == 1) {
+    KokkosComm::Req recvreq = KokkosComm::irecv(v, 0, 1, comm);
+    recvreq.wait();
+  }
+}
 
 template <typename View>
-void osu_latency_MPI_isendirecv(benchmark::State &, MPI_Comm comm, int rank, const View &v){
-    MPI_Barrier(comm);
-    MPI_Request sendreq, recvreq;
-    if(rank == 0){
-        MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &recvreq);
-        MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
-    } else if (rank == 1){
-        MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &sendreq);
-        MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
-    }
+void osu_latency_MPI_isendirecv(benchmark::State &, MPI_Comm comm, int rank, const View &v) {
+  MPI_Barrier(comm);
+  MPI_Request sendreq, recvreq;
+  if (rank == 0) {
+    MPI_Irecv(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 1, 0, comm, &recvreq);
+    MPI_Wait(&recvreq, MPI_STATUS_IGNORE);
+  } else if (rank == 1) {
+    MPI_Isend(v.data(), v.size(), KokkosComm::Impl::mpi_type<typename View::value_type>(), 0, 0, comm, &sendreq);
+    MPI_Wait(&sendreq, MPI_STATUS_IGNORE);
+  }
 }
 
-void benchmark_osu_latency_KokkosComm_isendirecv(benchmark::State &state){
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if(size != 2){
-        state.SkipWithError("benchmark_osu_latency_KokkosComm needs exactly 2 ranks");
-    }
+void benchmark_osu_latency_KokkosComm_isendirecv(benchmark::State &state) {
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (size != 2) {
+    state.SkipWithError("benchmark_osu_latency_KokkosComm needs exactly 2 ranks");
+  }
 
-    auto space = Kokkos::DefaultExecutionSpace();
-    using view_type = Kokkos::View<char *>;
-    view_type a("", state.range(0));
+  auto space      = Kokkos::DefaultExecutionSpace();
+  using view_type = Kokkos::View<char *>;
+  view_type a("", state.range(0));
 
-    while(state.KeepRunning()){
-        do_iteration(state, MPI_COMM_WORLD, osu_latency_Kokkos_Comm_isendirecv<Kokkos::DefaultExecutionSpace, view_type>, space, rank, a);
-    }
-    state.counters["bytes"] = a.size() * 2;
+  while (state.KeepRunning()) {
+    do_iteration(state, MPI_COMM_WORLD, osu_latency_Kokkos_Comm_isendirecv<Kokkos::DefaultExecutionSpace, view_type>,
+                 space, rank, a);
+  }
+  state.counters["bytes"] = a.size() * 2;
 }
 
-void benchmark_osu_latency_MPI_isendirecv(benchmark::State &state){
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank); 
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
-    if(size != 2){
-        state.SkipWithError("benchmark_osu_latency_MPI needs exactly 2 ranks");
-    }
+void benchmark_osu_latency_MPI_isendirecv(benchmark::State &state) {
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (size != 2) {
+    state.SkipWithError("benchmark_osu_latency_MPI needs exactly 2 ranks");
+  }
 
-    using view_type = Kokkos::View<char *>;
-    view_type a("", state.range(0));
+  using view_type = Kokkos::View<char *>;
+  view_type a("", state.range(0));
 
-    while(state.KeepRunning()){
-        do_iteration(state, MPI_COMM_WORLD, osu_latency_MPI_isendirecv<view_type>, rank, a);
-    }
-    state.counters["bytes"] = a.size() * 2;
+  while (state.KeepRunning()) {
+    do_iteration(state, MPI_COMM_WORLD, osu_latency_MPI_isendirecv<view_type>, rank, a);
+  }
+  state.counters["bytes"] = a.size() * 2;
 }
 
-// BENCHMARK(benchmark_osu_latency_KokkosComm_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
-// BENCHMARK(benchmark_osu_latency_MPI_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 32 * 1024 * 1024);
+// BENCHMARK(benchmark_osu_latency_KokkosComm_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1,
+// 32 * 1024 * 1024);
+// BENCHMARK(benchmark_osu_latency_MPI_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1,
+// 32 * 1024 * 1024);
 
-BENCHMARK(benchmark_osu_latency_KokkosComm_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 1024);
-BENCHMARK(benchmark_osu_latency_MPI_isendirecv)->UseManualTime()->Unit(benchmark::kMicrosecond)->RangeMultiplier(2)->Range(1, 1024);
+BENCHMARK(benchmark_osu_latency_KokkosComm_isendirecv)
+    ->UseManualTime()
+    ->Unit(benchmark::kMicrosecond)
+    ->RangeMultiplier(2)
+    ->Range(1, 1024);
+BENCHMARK(benchmark_osu_latency_MPI_isendirecv)
+    ->UseManualTime()
+    ->Unit(benchmark::kMicrosecond)
+    ->RangeMultiplier(2)
+    ->Range(1, 1024);
