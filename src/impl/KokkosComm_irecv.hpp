@@ -21,6 +21,7 @@
 #include <Kokkos_Core.hpp>
 
 #include "KokkosComm_pack_traits.hpp"
+#include "KokkosComm_request.hpp"
 #include "KokkosComm_traits.hpp"
 
 // impl
@@ -33,8 +34,6 @@ template <KokkosView RecvView>
 void irecv(RecvView &rv, int src, int tag, MPI_Comm comm, MPI_Request &req) {
   Kokkos::Tools::pushRegion("KokkosComm::Impl::irecv");
 
-  using KCT = KokkosComm::Traits<RecvView>;
-
   if (KokkosComm::is_contiguous(rv)) {
     using RecvScalar = typename RecvView::value_type;
     MPI_Irecv(KokkosComm::data_handle(rv), KokkosComm::span(rv), mpi_type_v<RecvScalar>, src, tag, comm, &req);
@@ -44,4 +43,13 @@ void irecv(RecvView &rv, int src, int tag, MPI_Comm comm, MPI_Request &req) {
 
   Kokkos::Tools::popRegion();
 }
+
+template <KokkosView RecvView>
+KokkosComm::Req irecv(RecvView &rv, int src, int tag, MPI_Comm comm) {
+  Kokkos::Tools::pushRegion("KokkosComm::Impl::irecv");
+  KokkosComm::Req req;
+  irecv(rv, src, tag, comm, req.mpi_req());
+  return req;
+}
+
 }  // namespace KokkosComm::Impl
