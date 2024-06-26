@@ -29,6 +29,22 @@
 
 namespace KokkosComm::Impl {
 
+template <KokkosView RecvView, typename Packer>
+void irecv(RecvView &rv, int src, int tag, MPI_Comm comm, MPI_Request &req) {
+  Kokkos::Tools::pushRegion("KokkosComm::Impl::irecv");
+
+  if(KokkosComm::is_contiguous(rv)){
+    using RecvScalar = typename RecvView::value_type;
+    MPI_Irecv(KokkosComm::data_handle(rv), KokkosComm::span(rv), mpi_type_v<RecvScalar>, src, tag, comm, &req);
+  } else {
+    MpiArgs args = Packer::allocate_packed_for(space, rv);
+    MPI_Irecv(args.view, args.count, args.datatype, src, tag, comm, &req);
+    Packer::unpack_into(space, rv, args.view); //TODO test
+  }
+
+  Kokkos::Tools::popRegion();
+}
+
 // low-level API
 template <KokkosView RecvView>
 void irecv(RecvView &rv, int src, int tag, MPI_Comm comm, MPI_Request &req) {
@@ -38,7 +54,7 @@ void irecv(RecvView &rv, int src, int tag, MPI_Comm comm, MPI_Request &req) {
     using RecvScalar = typename RecvView::value_type;
     MPI_Irecv(KokkosComm::data_handle(rv), KokkosComm::span(rv), mpi_type_v<RecvScalar>, src, tag, comm, &req);
   } else {
-    throw std::runtime_error("Only contiguous irecv viewsupported");
+    throw std::runtime_error("Only contiguous irecv view supported");
   }
 
   Kokkos::Tools::popRegion();
