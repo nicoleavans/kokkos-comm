@@ -525,6 +525,12 @@ struct SystemKC {
     // if (Z_hi != Z) auto T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
 
     // outgoing halo
+    // if (X_lo != 0) T_left_out = buffer_t("System::T_left_out", Y_hi - Y_lo, Z_hi - Z_lo);
+    // if (X_hi != X) T_right_out = buffer_t("System::T_right_out", Y_hi - Y_lo, Z_hi - Z_lo);
+    // if (Y_lo != 0) T_down_out = buffer_t("System::T_down_out", X_hi - X_lo, Z_hi - Z_lo);
+    // if (Y_hi != Y) T_up_out = buffer_t("System::T_up_out", X_hi - X_lo, Z_hi - Z_lo);
+    // if (Z_lo != 0) T_front_out = buffer_t("System::T_front_out", X_hi - X_lo, Y_hi - Y_lo);
+    // if (Z_hi != Z) T_back_out = buffer_t("System::T_back_out", X_hi - X_lo, Y_hi - Y_lo);
     if (X_lo != 0) auto T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
     if (X_hi != X) auto T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
     if (Y_lo != 0) auto T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
@@ -690,9 +696,7 @@ struct SystemKC {
     int mar = 0;
     if (X_lo != 0) {
       E_left.fence();
-      // void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer, MPI_Request* request_send, MPI_Request* request_recv)
       // comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
-      // void isend_irecv(const Space &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag){ 
       comm.isend_irecv(E_left, T_left_out, T_left, comm.left, comm.left, 0);
       mar++;
     }
