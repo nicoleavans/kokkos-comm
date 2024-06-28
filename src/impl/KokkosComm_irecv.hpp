@@ -42,9 +42,8 @@ KokkosComm::Req irecv(const ExecSpace &space, RecvView &rv, int src, int tag, MP
     MPI_Irecv(args.view, args.count, args.datatype, src, tag, comm, &req.mpi_req());
     Packer::unpack_into(space, rv, args.view);
     space.fence(); //TODO test
-    return req;
   }
-
+  return req;
   Kokkos::Tools::popRegion();
 }
 
