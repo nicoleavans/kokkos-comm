@@ -42,7 +42,7 @@ struct DeepCopy {
 
   template <KokkosExecutionSpace ExecSpace>
   static args_type allocate_packed_for(const ExecSpace &space, const std::string &label, const View &src) {
-    using KCT = KokkosComm::Traits<View>;
+    // using KCT = KokkosComm::Traits<View>;
 
     if constexpr (KokkosComm::rank<View>() == 1) {
       non_const_packed_view_type packed(Kokkos::view_alloc(space, Kokkos::WithoutInitializing, label), src.extent(0));
@@ -82,13 +82,13 @@ struct MpiDatatype {
   static args_type allocate_packed_for(const ExecSpace & /*space*/, const std::string & /*label*/, const View &src) {
     using ValueType = typename View::value_type;
 
-    using KCT = KokkosComm::Traits<View>;
+    // using KCT = KokkosComm::Traits<View>;
 
     MPI_Datatype type = mpi_type<ValueType>();
-    for (size_t d = 0; d < KokkosComm::Traits<View>::rank(); ++d) {
+    for (size_t d = 0; d < KokkosComm::rank<View>(); ++d) {
       MPI_Datatype newtype;
-      MPI_Type_create_hvector(KCT::extent(src, d) /*count*/, 1 /*block length*/,
-                              KCT::stride(src, d) * sizeof(ValueType), type, &newtype);
+      MPI_Type_create_hvector(KokkosComm::extent(src, d) /*count*/, 1 /*block length*/,
+                              KokkosComm::stride(src, d) * sizeof(ValueType), type, &newtype);
       type = newtype;
     }
     MPI_Type_commit(&type);
