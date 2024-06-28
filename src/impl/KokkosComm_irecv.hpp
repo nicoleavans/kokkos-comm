@@ -29,17 +29,20 @@
 
 namespace KokkosComm::Impl {
 
-template <KokkosView RecvView, typename Packer>
-void irecv(RecvView &rv, int src, int tag, MPI_Comm comm, MPI_Request &req) {
+template <KokkosExecutionSpace ExecSpace, KokkosView RecvView, typename Packer>
+KokkosComm::Req irecv(const ExecSpace &space, RecvView &rv, int src, int tag, MPI_Comm comm) {
   Kokkos::Tools::pushRegion("KokkosComm::Impl::irecv");
+  KokkosComm::Req req;
 
   if(KokkosComm::is_contiguous(rv)){
     using RecvScalar = typename RecvView::value_type;
-    MPI_Irecv(KokkosComm::data_handle(rv), KokkosComm::span(rv), mpi_type_v<RecvScalar>, src, tag, comm, &req);
+    MPI_Irecv(KokkosComm::data_handle(rv), KokkosComm::span(rv), mpi_type_v<RecvScalar>, src, tag, comm, req.mpi_req());
   } else {
-    MpiArgs args = Packer::allocate_packed_for(space, rv);
-    MPI_Irecv(args.view, args.count, args.datatype, src, tag, comm, &req);
-    Packer::unpack_into(space, rv, args.view); //TODO test
+    typename Packer::MpiArgs args = Packer::allocate_packed_for(space, rv);
+    MPI_Irecv(args.view, args.count, args.datatype, src, tag, comm, req.mpi_req());
+    Packer::unpack_into(space, rv, args.view);
+    space.fence(); //TODO test
+    return req;
   }
 
   Kokkos::Tools::popRegion();
