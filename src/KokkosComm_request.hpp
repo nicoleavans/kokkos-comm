@@ -39,6 +39,7 @@ class Req {
     Record() : req_(MPI_REQUEST_NULL) {}
     MPI_Request req_;
     std::vector<std::shared_ptr<ViewHolderBase>> until_waits_;
+    std::vector<std::function<void()>> functions_after_wait_;
   };
 
  public:
@@ -48,6 +49,9 @@ class Req {
 
   void wait() {
     MPI_Wait(&(record_->req_), MPI_STATUS_IGNORE);
+    for (auto &f : record_->functions_after_wait_) {
+      f();
+    }
     record_->until_waits_.clear();  // drop any views we're keeping alive until wait()
   }
 
@@ -55,6 +59,10 @@ class Req {
   template <typename View>
   void keep_until_wait(const View &v) {
     record_->until_waits_.push_back(std::make_shared<ViewHolder<View>>(v));
+  }
+
+  void call_after_wait(std::function<void()> &&f) {
+    record_->functions_after_wait_.push_back(f);
   }
 
  private:
