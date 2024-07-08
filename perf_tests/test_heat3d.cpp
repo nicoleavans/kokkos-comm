@@ -212,11 +212,11 @@ struct System {
         time_all += time - old_time;
         GUPs += 1e-9 * (dT.size() / time_inner);
         if ((t == N) && (comm.me == 0)) {
-          printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
-                 comm.nranks, t, T_ave, time_inner, time_surface, time_update,
-                 time - old_time, /* time last iter */
-                 time_all,        /* current runtime  */
-                 GUPs / t, X, 1e-6 * (X * sizeof(double)));
+          // printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
+          //        comm.nranks, t, T_ave, time_inner, time_surface, time_update,
+          //        time - old_time, /* time last iter */
+          //        time_all,        /* current runtime  */
+          //        GUPs / t, X, 1e-6 * (X * sizeof(double)));
           old_time = time;
         }
       }
@@ -576,11 +576,11 @@ struct SystemKC_DC {
         time_all += time - old_time;
         GUPs += 1e-9 * (dT.size() / time_inner);
         if ((t == N) && (comm.me == 0)) {
-          printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
-                 comm.nranks, t, T_ave, time_inner, time_surface, time_update,
-                 time - old_time, /* time last iter */
-                 time_all,        /* current runtime  */
-                 GUPs / t, X, 1e-6 * (X * sizeof(double)));
+          // printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
+          //        comm.nranks, t, T_ave, time_inner, time_surface, time_update,
+          //        time - old_time, /* time last iter */
+          //        time_all,        /* current runtime  */
+          //        GUPs / t, X, 1e-6 * (X * sizeof(double)));
           old_time = time;
         }
       }
@@ -954,11 +954,11 @@ struct SystemKC_MPIDT {
         time_all += time - old_time;
         GUPs += 1e-9 * (dT.size() / time_inner);
         if ((t == N) && (comm.me == 0)) {
-          printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
-                 comm.nranks, t, T_ave, time_inner, time_surface, time_update,
-                 time - old_time, /* time last iter */
-                 time_all,        /* current runtime  */
-                 GUPs / t, X, 1e-6 * (X * sizeof(double)));
+          // printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
+          //        comm.nranks, t, T_ave, time_inner, time_surface, time_update,
+          //        time - old_time, /* time last iter */
+          //        time_all,        /* current runtime  */
+          //        GUPs / t, X, 1e-6 * (X * sizeof(double)));
           old_time = time;
         }
       }
@@ -1195,50 +1195,35 @@ struct SystemKC_MPIDT {
 };
 
 void benchmark_heat3d_mpi(benchmark::State &state) {
-  auto start = std::chrono::high_resolution_clock::now();
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
-  sys.timestep();
-  sys.destroy_exec_spaces();
-  auto end = std::chrono::high_resolution_clock::now();
-  auto elapsed_seconds = std::chrono::duration_cast<std::chrono::duration<double>>(end - start);
-  std::cout << "mpi_elapsed_seconds = " << elapsed_seconds << '\n';
-  state.SetIterationTime(elapsed_seconds.count());
-  if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
-    state.SkipWithMessage("Loop exited prematurely!");
+  auto f = std::bind(&System::timestep, &sys);
+  while(state.KeepRunning()){
+    do_iteration(state, MPI_COMM_WORLD, f);
   }
+  sys.destroy_exec_spaces();
 }
 
 void benchmark_heat3d_kc_dc(benchmark::State &state) {
-  auto start = std::chrono::high_resolution_clock::now();
   SystemKC_DC sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
-  sys.timestep();
-  sys.destroy_exec_spaces();
-  auto end = std::chrono::high_resolution_clock::now();
-  auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
-  std::cout << "kc_elapsed_seconds = " << elapsed_seconds << '\n';
-  state.SetIterationTime(elapsed_seconds.count());
-  if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
-    state.SkipWithMessage("Loop exited prematurely!");
+  auto f = std::bind(&SystemKC_DC::timestep, &sys);
+  while(state.KeepRunning()){
+    do_iteration(state, MPI_COMM_WORLD, f);
   }
+  sys.destroy_exec_spaces();
 }
 
 void benchmark_heat3d_kc_mpidt(benchmark::State &state) {
-  auto start = std::chrono::high_resolution_clock::now();
   SystemKC_MPIDT sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
-  sys.timestep();
-  sys.destroy_exec_spaces();
-  auto end = std::chrono::high_resolution_clock::now();
-  auto elapsed_seconds = std::chrono::duration_cast < std::chrono::duration<double>>(end - start);
-  std::cout << "kc_elapsed_seconds = " << elapsed_seconds << '\n';
-  state.SetIterationTime(elapsed_seconds.count());
-  if (!(state.skipped() || state.iterations() >= state.max_iterations)) {
-    state.SkipWithMessage("Loop exited prematurely!");
+  auto f = std::bind(&SystemKC_MPIDT::timestep, &sys);
+  while(state.KeepRunning()){
+    do_iteration(state, MPI_COMM_WORLD, f);
   }
+  sys.destroy_exec_spaces();
 }
 
-BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMillisecond);
-BENCHMARK(benchmark_heat3d_kc_dc)->UseManualTime()->Unit(benchmark::kMillisecond);
-BENCHMARK(benchmark_heat3d_kc_mpidt)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMicrosecond);
+BENCHMARK(benchmark_heat3d_kc_dc)->UseManualTime()->Unit(benchmark::kMicrosecond);
+BENCHMARK(benchmark_heat3d_kc_mpidt)->UseManualTime()->Unit(benchmark::kMicrosecond);
