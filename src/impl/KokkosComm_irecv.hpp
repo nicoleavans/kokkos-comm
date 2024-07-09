@@ -40,12 +40,13 @@ KokkosComm::Req irecv(const ExecSpace &space, RecvView &rv, int src, int tag, MP
   } else {
     KokkosComm::Impl::Packer::MpiArgs args = Packer::allocate_packed_for(space, "rv", rv);
     req.keep_until_wait(args.view);
-    MPI_Irecv(&args.view, args.count, args.datatype, src, tag, comm, &req.mpi_req());
+    MPI_Irecv(args.view.data(), args.count, args.datatype, src, tag, comm, &req.mpi_req());
+
     auto unpacker = [=](){
       Packer::unpack_into(space, rv, args.view);
-    }; 
+    };
+
     req.call_after_wait(unpacker);
-    std::cerr << __FILE__ << ":" << __LINE__ << "\n";
     space.fence(); //TODO test
   }
   return req;
