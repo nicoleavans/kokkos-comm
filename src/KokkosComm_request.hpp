@@ -53,6 +53,7 @@ class Req {
       f();
     }
     record_->until_waits_.clear();  // drop any views we're keeping alive until wait()
+    record_->functions_after_wait_.clear();
   }
 
   // keep a reference to this view around until wait() is called

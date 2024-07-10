@@ -184,42 +184,14 @@ struct System {
 
   // run_time_loops
   void timestep() {
-    Kokkos::Timer timer;
-    double old_time = 0.0; double time_all = 0.0;
-    double GUPs     = 0.0;
-    double time_a, time_b, time_c, time_d;
-    double time_inner, time_surface, time_update;
-    time_inner = time_surface = time_update = 0.0;
     for (int t = 0; t <= N; t++) {
       if (t > N / 2) P = 0.0;
-      time_a = timer.seconds();
       pack_T_halo();       // Overlap O1
       compute_inner_dT();  // Overlap O1
       Kokkos::fence();
-      time_b = timer.seconds();
       exchange_T_halo();
       compute_surface_dT();
       Kokkos::fence();
-      time_c       = timer.seconds();
-      double T_ave = update_T();
-      time_d       = timer.seconds();
-      time_inner += time_b - time_a;
-      time_surface += time_c - time_b;
-      time_update += time_d - time_c;
-      T_ave /= 1e-9 * (X * Y * Z);
-      if ((t % I == 0 || t == N) && (comm.me == 0)) {
-        double time = timer.seconds();
-        time_all += time - old_time;
-        GUPs += 1e-9 * (dT.size() / time_inner);
-        if ((t == N) && (comm.me == 0)) {
-          // printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
-          //        comm.nranks, t, T_ave, time_inner, time_surface, time_update,
-          //        time - old_time, /* time last iter */
-          //        time_all,        /* current runtime  */
-          //        GUPs / t, X, 1e-6 * (X * sizeof(double)));
-          old_time = time;
-        }
-      }
     }
   }
 
@@ -455,11 +427,20 @@ struct SystemKC_DC {
   int I; // interval for print
 
   // Temperature and delta Temperature
-  Kokkos::View<double***> T, dT;
+  using DataView = Kokkos::View<double ***>;
+  DataView T, dT;
+
   // Halo data
-  using buffer_t = Kokkos::View<double**, Kokkos::LayoutLeft, Kokkos::DefaultExecutionSpace>;
-  buffer_t T_left, T_right, T_up, T_down, T_front, T_back;
-  buffer_t T_left_out, T_right_out, T_up_out, T_down_out, T_front_out, T_back_out;
+  using lr_buffer_t = Kokkos::Subview<DataView, int, decltype(Kokkos::ALL), decltype(Kokkos::ALL)>;
+  using ud_buffer_t = Kokkos::Subview<DataView, decltype(Kokkos::ALL), int, decltype(Kokkos::ALL)>;
+  using fb_buffer_t = Kokkos::Subview<DataView, decltype(Kokkos::ALL), decltype(Kokkos::ALL), int>;
+  lr_buffer_t T_left, T_right;
+  ud_buffer_t T_up, T_down;
+  fb_buffer_t T_front, T_back;
+
+  lr_buffer_t T_left_out, T_right_out;
+  ud_buffer_t T_up_out, T_down_out;
+  fb_buffer_t T_front_out, T_back_out;
 
   Kokkos::DefaultExecutionSpace E_left, E_right, E_up, E_down, E_front, E_back, E_bulk;
 
@@ -518,72 +499,32 @@ struct SystemKC_DC {
     Kokkos::deep_copy(T, T0);
 
     // incoming halos
-    // if (X_lo != 0) T_left = buffer_t("System::T_left", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (X_hi != X) T_right = buffer_t("System::T_right", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (Y_lo != 0) T_down = buffer_t("System::T_down", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Y_hi != Y) T_up = buffer_t("System::T_up", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Z_lo != 0) T_front = buffer_t("System::T_front", X_hi - X_lo, Y_hi - Y_lo);
-    // if (Z_hi != Z) T_back = buffer_t("System::T_back", X_hi - X_lo, Y_hi - Y_lo);
-    if (X_lo != 0) auto T_left = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
-    if (X_hi != X) auto T_right = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) auto T_down = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
-    if (Y_hi != Y) auto T_up = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
-    if (Z_lo != 0) auto T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
-    if (Z_hi != Z) auto T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
+    if (X_lo != 0) T_left = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
+    if (X_hi != X) T_right = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
+    if (Y_lo != 0) T_down = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
+    if (Y_hi != Y) T_up = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
+    if (Z_lo != 0) T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
+    if (Z_hi != Z) T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
 
     // outgoing halo
-    // if (X_lo != 0) T_left_out = buffer_t("System::T_left_out", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (X_hi != X) T_right_out = buffer_t("System::T_right_out", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (Y_lo != 0) T_down_out = buffer_t("System::T_down_out", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Y_hi != Y) T_up_out = buffer_t("System::T_up_out", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Z_lo != 0) T_front_out = buffer_t("System::T_front_out", X_hi - X_lo, Y_hi - Y_lo);
-    // if (Z_hi != Z) T_back_out = buffer_t("System::T_back_out", X_hi - X_lo, Y_hi - Y_lo);
-    if (X_lo != 0) auto T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (X_hi != X) auto T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) auto T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Y_hi != Y) auto T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Z_lo != 0) auto T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
-    if (Z_hi != Z) auto T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (X_lo != 0) T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (X_hi != X) T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (Y_lo != 0) T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Y_hi != Y) T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Z_lo != 0) T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (Z_hi != Z) T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
   }
 
   // run_time_loops
   void timestep() {
-    Kokkos::Timer timer;
-    double old_time = 0.0; double time_all = 0.0;
-    double GUPs     = 0.0;
-    double time_a, time_b, time_c, time_d;
-    double time_inner, time_surface, time_update;
-    time_inner = time_surface = time_update = 0.0;
     for (int t = 0; t <= N; t++) {
       if (t > N / 2) P = 0.0;
-      time_a = timer.seconds();
       pack_T_halo();       // Overlap O1
       compute_inner_dT();  // Overlap O1
       Kokkos::fence();
-      time_b = timer.seconds();
       exchange_T_halo();
       compute_surface_dT();
       Kokkos::fence();
-      time_c       = timer.seconds();
-      double T_ave = update_T();
-      time_d       = timer.seconds();
-      time_inner += time_b - time_a;
-      time_surface += time_c - time_b;
-      time_update += time_d - time_c;
-      T_ave /= 1e-9 * (X * Y * Z);
-      if ((t % I == 0 || t == N) && (comm.me == 0)) {
-        double time = timer.seconds();
-        time_all += time - old_time;
-        GUPs += 1e-9 * (dT.size() / time_inner);
-        if ((t == N) && (comm.me == 0)) {
-          // printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
-          //        comm.nranks, t, T_ave, time_inner, time_surface, time_update,
-          //        time - old_time, /* time last iter */
-          //        time_all,        /* current runtime  */
-          //        GUPs / t, X, 1e-6 * (X * sizeof(double)));
-          old_time = time;
-        }
-      }
     }
   }
 
@@ -668,32 +609,26 @@ struct SystemKC_DC {
     mpi_active_requests = 0;
     int mar             = 0;
     if (X_lo != 0) {
-      // Kokkos::deep_copy(E_left, T_left_out, Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL));
       comm.isend_irecv(E_left, T_left_out, T_left, comm.left, comm.left, 0);
       mar++;
     }
     if (Y_lo != 0) {
-      // Kokkos::deep_copy(E_down, T_down_out, Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL));
       comm.isend_irecv(E_down, T_down_out, T_down, comm.down, comm.down, 0);
       mar++;
     }
     if (Z_lo != 0) {
-      // Kokkos::deep_copy(E_front, T_front_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0));
       comm.isend_irecv(E_front, T_front_out, T_front, comm.front, comm.front, 0);
       mar++;
     }
     if (X_hi != X) {
-      // Kokkos::deep_copy(E_right, T_right_out, Kokkos::subview(T, X_hi - X_lo - 1, Kokkos::ALL, Kokkos::ALL));
       comm.isend_irecv(E_right, T_right_out, T_right, comm.right, comm.right, 0);
       mar++;
     }
     if (Y_hi != Y) {
-      // Kokkos::deep_copy(E_up, T_up_out, Kokkos::subview(T, Kokkos::ALL, Y_hi - Y_lo - 1, Kokkos::ALL));
       comm.isend_irecv(E_up, T_up_out, T_up, comm.up, comm.up, 0);
       mar++;
     }
     if (Z_hi != Z) {
-      // Kokkos::deep_copy(E_back, T_back_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, Z_hi - Z_lo - 1));
       comm.isend_irecv(E_back, T_back_out, T_back, comm.back, comm.back, 0);
       mar++;
     }
@@ -703,37 +638,31 @@ struct SystemKC_DC {
     int mar = 0;
     if (X_lo != 0) {
       E_left.fence();
-      // comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv(E_left, T_left_out, T_left, comm.left, comm.left, 0);
       mar++;
     }
     if (Y_lo != 0) {
       E_down.fence();
-      // comm.isend_irecv(comm.down, T_down_out, T_down, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv(E_down, T_down_out, T_down, comm.down, comm.down, 0);
       mar++;
     }
     if (Z_lo != 0) {
       E_front.fence();
-      // comm.isend_irecv(comm.front, T_front_out, T_front, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv(E_front, T_front_out, T_front, comm.front, comm.front, 0);
       mar++;
     }
     if (X_hi != X) {
       E_right.fence();
-      // comm.isend_irecv(comm.right, T_right_out, T_right, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv(E_right, T_right_out, T_right, comm.right, comm.right, 0);
       mar++;
     }
     if (Y_hi != Y) {
       E_up.fence();
-      // comm.isend_irecv(comm.up, T_up_out, T_up, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv(E_up, T_up_out, T_up, comm.up, comm.up, 0);
       mar++;
     }
     if (Z_hi != Z) {
       E_back.fence();
-      // comm.isend_irecv(comm.back, T_back_out, T_back, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv(E_back, T_back_out, T_back, comm.back, comm.back, 0);
       mar++;
     }
@@ -833,11 +762,20 @@ struct SystemKC_MPIDT {
   int I; // interval for print
 
   // Temperature and delta Temperature
-  Kokkos::View<double***> T, dT;
+  using DataView = Kokkos::View<double ***>;
+  DataView T, dT;
+
   // Halo data
-  using buffer_t = Kokkos::View<double**, Kokkos::LayoutLeft, Kokkos::DefaultExecutionSpace>;
-  buffer_t T_left, T_right, T_up, T_down, T_front, T_back;
-  buffer_t T_left_out, T_right_out, T_up_out, T_down_out, T_front_out, T_back_out;
+  using lr_buffer_t = Kokkos::Subview<DataView, int, decltype(Kokkos::ALL), decltype(Kokkos::ALL)>;
+  using ud_buffer_t = Kokkos::Subview<DataView, decltype(Kokkos::ALL), int, decltype(Kokkos::ALL)>;
+  using fb_buffer_t = Kokkos::Subview<DataView, decltype(Kokkos::ALL), decltype(Kokkos::ALL), int>;
+  lr_buffer_t T_left, T_right;
+  ud_buffer_t T_up, T_down;
+  fb_buffer_t T_front, T_back;
+
+  lr_buffer_t T_left_out, T_right_out;
+  ud_buffer_t T_up_out, T_down_out;
+  fb_buffer_t T_front_out, T_back_out;
 
   Kokkos::DefaultExecutionSpace E_left, E_right, E_up, E_down, E_front, E_back, E_bulk;
 
@@ -896,72 +834,32 @@ struct SystemKC_MPIDT {
     Kokkos::deep_copy(T, T0);
 
     // incoming halos
-    // if (X_lo != 0) T_left = buffer_t("System::T_left", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (X_hi != X) T_right = buffer_t("System::T_right", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (Y_lo != 0) T_down = buffer_t("System::T_down", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Y_hi != Y) T_up = buffer_t("System::T_up", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Z_lo != 0) T_front = buffer_t("System::T_front", X_hi - X_lo, Y_hi - Y_lo);
-    // if (Z_hi != Z) T_back = buffer_t("System::T_back", X_hi - X_lo, Y_hi - Y_lo);
-    if (X_lo != 0) auto T_left = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (X_hi != X) auto T_right = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) auto T_down = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Y_hi != Y) auto T_up = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Z_lo != 0) auto T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
-    if (Z_hi != Z) auto T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (X_lo != 0) T_left = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (X_hi != X) T_right = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (Y_lo != 0) T_down = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Y_hi != Y) T_up = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Z_lo != 0) T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (Z_hi != Z) T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
 
     // outgoing halo
-    // if (X_lo != 0) T_left_out = buffer_t("System::T_left_out", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (X_hi != X) T_right_out = buffer_t("System::T_right_out", Y_hi - Y_lo, Z_hi - Z_lo);
-    // if (Y_lo != 0) T_down_out = buffer_t("System::T_down_out", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Y_hi != Y) T_up_out = buffer_t("System::T_up_out", X_hi - X_lo, Z_hi - Z_lo);
-    // if (Z_lo != 0) T_front_out = buffer_t("System::T_front_out", X_hi - X_lo, Y_hi - Y_lo);
-    // if (Z_hi != Z) T_back_out = buffer_t("System::T_back_out", X_hi - X_lo, Y_hi - Y_lo);
-    if (X_lo != 0) auto T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (X_hi != X) auto T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) auto T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Y_hi != Y) auto T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Z_lo != 0) auto T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
-    if (Z_hi != Z) auto T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (X_lo != 0) T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (X_hi != X) T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (Y_lo != 0) T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Y_hi != Y) T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
+    if (Z_lo != 0) T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (Z_hi != Z) T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
   }
 
   // run_time_loops
   void timestep() {
-    Kokkos::Timer timer;
-    double old_time = 0.0; double time_all = 0.0;
-    double GUPs     = 0.0;
-    double time_a, time_b, time_c, time_d;
-    double time_inner, time_surface, time_update;
-    time_inner = time_surface = time_update = 0.0;
     for (int t = 0; t <= N; t++) {
       if (t > N / 2) P = 0.0;
-      time_a = timer.seconds();
       pack_T_halo();       // Overlap O1
       compute_inner_dT();  // Overlap O1
       Kokkos::fence();
-      time_b = timer.seconds();
       exchange_T_halo();
       compute_surface_dT();
       Kokkos::fence();
-      time_c       = timer.seconds();
-      double T_ave = update_T();
-      time_d       = timer.seconds();
-      time_inner += time_b - time_a;
-      time_surface += time_c - time_b;
-      time_update += time_d - time_c;
-      T_ave /= 1e-9 * (X * Y * Z);
-      if ((t % I == 0 || t == N) && (comm.me == 0)) {
-        double time = timer.seconds();
-        time_all += time - old_time;
-        GUPs += 1e-9 * (dT.size() / time_inner);
-        if ((t == N) && (comm.me == 0)) {
-          // printf("heat3D,Kokkos+MPI,%i,%i,%lf,%lf,%lf,%lf,%lf,%lf,%lf,%i,%f\n",
-          //        comm.nranks, t, T_ave, time_inner, time_surface, time_update,
-          //        time - old_time, /* time last iter */
-          //        time_all,        /* current runtime  */
-          //        GUPs / t, X, 1e-6 * (X * sizeof(double)));
-          old_time = time;
-        }
-      }
     }
   }
 
@@ -1046,32 +944,26 @@ struct SystemKC_MPIDT {
     mpi_active_requests = 0;
     int mar             = 0;
     if (X_lo != 0) {
-      // Kokkos::deep_copy(E_left, T_left_out, Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL));
       comm.isend_irecv_dt(E_left, T_left_out, T_left, comm.left, comm.left, 0);
       mar++;
     }
     if (Y_lo != 0) {
-      // Kokkos::deep_copy(E_down, T_down_out, Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL));
       comm.isend_irecv_dt(E_down, T_down_out, T_down, comm.down, comm.down, 0);
       mar++;
     }
     if (Z_lo != 0) {
-      // Kokkos::deep_copy(E_front, T_front_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0));
       comm.isend_irecv_dt(E_front, T_front_out, T_front, comm.front, comm.front, 0);
       mar++;
     }
     if (X_hi != X) {
-      // Kokkos::deep_copy(E_right, T_right_out, Kokkos::subview(T, X_hi - X_lo - 1, Kokkos::ALL, Kokkos::ALL));
       comm.isend_irecv_dt(E_right, T_right_out, T_right, comm.right, comm.right, 0);
       mar++;
     }
     if (Y_hi != Y) {
-      // Kokkos::deep_copy(E_up, T_up_out, Kokkos::subview(T, Kokkos::ALL, Y_hi - Y_lo - 1, Kokkos::ALL));
       comm.isend_irecv_dt(E_up, T_up_out, T_up, comm.up, comm.up, 0);
       mar++;
     }
     if (Z_hi != Z) {
-      // Kokkos::deep_copy(E_back, T_back_out, Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, Z_hi - Z_lo - 1));
       comm.isend_irecv_dt(E_back, T_back_out, T_back, comm.back, comm.back, 0);
       mar++;
     }
@@ -1081,37 +973,31 @@ struct SystemKC_MPIDT {
     int mar = 0;
     if (X_lo != 0) {
       E_left.fence();
-      // comm.isend_irecv(comm.left, T_left_out, T_left, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv_dt(E_left, T_left_out, T_left, comm.left, comm.left, 0);
       mar++;
     }
     if (Y_lo != 0) {
       E_down.fence();
-      // comm.isend_irecv(comm.down, T_down_out, T_down, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv_dt(E_down, T_down_out, T_down, comm.down, comm.down, 0);
       mar++;
     }
     if (Z_lo != 0) {
       E_front.fence();
-      // comm.isend_irecv(comm.front, T_front_out, T_front, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv_dt(E_front, T_front_out, T_front, comm.front, comm.front, 0);
       mar++;
     }
     if (X_hi != X) {
       E_right.fence();
-      // comm.isend_irecv(comm.right, T_right_out, T_right, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv_dt(E_right, T_right_out, T_right, comm.right, comm.right, 0);
       mar++;
     }
     if (Y_hi != Y) {
       E_up.fence();
-      // comm.isend_irecv(comm.up, T_up_out, T_up, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv_dt(E_up, T_up_out, T_up, comm.up, comm.up, 0);
       mar++;
     }
     if (Z_hi != Z) {
       E_back.fence();
-      // comm.isend_irecv(comm.back, T_back_out, T_back, &mpi_requests_send[mar], &mpi_requests_recv[mar]);
       comm.isend_irecv_dt(E_back, T_back_out, T_back, comm.back, comm.back, 0);
       mar++;
     }
