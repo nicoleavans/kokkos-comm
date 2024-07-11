@@ -499,20 +499,19 @@ struct SystemKC_DC {
     Kokkos::deep_copy(T, T0);
 
     // incoming halos
-    if (X_lo != 0) T_left = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
+    if (X_lo != 0) T_left = Kokkos::subview(T, T.extent(0) - 1, Kokkos::ALL, Kokkos::ALL);
     if (X_hi != X) T_right = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) T_down = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
+    if (Y_lo != 0) T_down = Kokkos::subview(T, Kokkos::ALL, T.extent(1) - 1, Kokkos::ALL);
     if (Y_hi != Y) T_up = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
-    if (Z_lo != 0) T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
+    if (Z_lo != 0) T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2) - 1);
     if (Z_hi != Z) T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
-
-    // outgoing halo
-    if (X_lo != 0) T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    // outgoing halos
+    if (X_lo != 0) T_left_out = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
     if (X_hi != X) T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Y_hi != Y) T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Z_lo != 0) T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
-    if (Z_hi != Z) T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (Y_lo != 0) T_down_out = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
+    if (Y_hi != Y) T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1) - 1, Kokkos::ALL);
+    if (Z_lo != 0) T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
+    if (Z_hi != Z) T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2) - 1);
   }
 
   // run_time_loops
@@ -834,20 +833,19 @@ struct SystemKC_MPIDT {
     Kokkos::deep_copy(T, T0);
 
     // incoming halos
-    if (X_lo != 0) T_left = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (X_hi != X) T_right = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) T_down = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Y_hi != Y) T_up = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Z_lo != 0) T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
-    if (Z_hi != Z) T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
-
-    // outgoing halo
-    if (X_lo != 0) T_left_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
+    if (X_lo != 0) T_left = Kokkos::subview(T, T.extent(0) - 1, Kokkos::ALL, Kokkos::ALL);
+    if (X_hi != X) T_right = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
+    if (Y_lo != 0) T_down = Kokkos::subview(T, Kokkos::ALL, T.extent(1) - 1, Kokkos::ALL);
+    if (Y_hi != Y) T_up = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
+    if (Z_lo != 0) T_front = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2) - 1);
+    if (Z_hi != Z) T_back = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
+    // outgoing halos
+    if (X_lo != 0) T_left_out = Kokkos::subview(T, 0, Kokkos::ALL, Kokkos::ALL);
     if (X_hi != X) T_right_out = Kokkos::subview(T, T.extent(0)-1, Kokkos::ALL, Kokkos::ALL);
-    if (Y_lo != 0) T_down_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Y_hi != Y) T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1)-1, Kokkos::ALL);
-    if (Z_lo != 0) T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
-    if (Z_hi != Z) T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2)-1);
+    if (Y_lo != 0) T_down_out = Kokkos::subview(T, Kokkos::ALL, 0, Kokkos::ALL);
+    if (Y_hi != Y) T_up_out = Kokkos::subview(T, Kokkos::ALL, T.extent(1) - 1, Kokkos::ALL);
+    if (Z_lo != 0) T_front_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, 0);
+    if (Z_hi != Z) T_back_out = Kokkos::subview(T, Kokkos::ALL, Kokkos::ALL, T.extent(2) - 1);
   }
 
   // run_time_loops
