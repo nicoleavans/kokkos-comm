@@ -19,9 +19,7 @@
 
 template <typename Space, typename View>
 void send_recv_slice_deepcopy_contig(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  // Create a slice of the 3D view
   auto sub_view = Kokkos::subview(v, 0, 0, Kokkos::ALL); // contig
-
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::DeepCopy<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -34,9 +32,7 @@ void send_recv_slice_deepcopy_contig(benchmark::State &, MPI_Comm comm, const Sp
 
 template <typename Space, typename View>
 void send_recv_slice_deepcopy_noncontig(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  // Create a slice of the 3D view
   auto sub_view = Kokkos::subview(v, 0, Kokkos::ALL, 0); // noncontig
-
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::DeepCopy<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -49,9 +45,7 @@ void send_recv_slice_deepcopy_noncontig(benchmark::State &, MPI_Comm comm, const
 
 template <typename Space, typename View>
 void send_recv_slice_deepcopy_noncontig2D(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  // Create a slice of the 3D view
   auto sub_view = Kokkos::subview(v, 0, Kokkos::ALL, Kokkos::ALL); //Non-contig. memory
-
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::DeepCopy<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -64,9 +58,7 @@ void send_recv_slice_deepcopy_noncontig2D(benchmark::State &, MPI_Comm comm, con
 
 template <typename Space, typename View>
 void send_recv_slice_datatype_contig(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  // Create a slice of the 3D view
   auto sub_view = Kokkos::subview(v, 0, 0, Kokkos::ALL); // contig
-
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::MpiDatatype<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -79,9 +71,7 @@ void send_recv_slice_datatype_contig(benchmark::State &, MPI_Comm comm, const Sp
 
 template <typename Space, typename View>
 void send_recv_slice_datatype_noncontig(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  // Create a slice of the 3D view
   auto sub_view = Kokkos::subview(v, 0, Kokkos::ALL, 0); // noncontig
-
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::MpiDatatype<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -94,9 +84,7 @@ void send_recv_slice_datatype_noncontig(benchmark::State &, MPI_Comm comm, const
 
 template <typename Space, typename View>
 void send_recv_slice_datatype_noncontig2D(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  // Create a slice of the 3D view
   auto sub_view = Kokkos::subview(v, 0, Kokkos::ALL, Kokkos::ALL); //Non-contig. memory
-
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::MpiDatatype<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -109,6 +97,7 @@ void send_recv_slice_datatype_noncontig2D(benchmark::State &, MPI_Comm comm, con
 
 void benchmark_3dslice_deepcopy_contig(benchmark::State &state) {
   int rank, size;
+
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   if (size < 2) {
@@ -118,12 +107,16 @@ void benchmark_3dslice_deepcopy_contig(benchmark::State &state) {
   auto space = Kokkos::DefaultExecutionSpace();
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
+  auto sub_view = Kokkos::subview(a, 0, 0, Kokkos::ALL);
+  size_t num_elements = sub_view.extent(0);
+  size_t element_size = sizeof(typename decltype(sub_view)::value_type);
+  size_t size_in_bytes = num_elements * element_size;
+
   while (state.KeepRunning()) {
     do_iteration(state, MPI_COMM_WORLD, send_recv_slice_deepcopy_contig<Kokkos::DefaultExecutionSpace, Kokkos::View<double ***>>, space,
                  rank, a);
   }
-  state.SetBytesProcessed(sizeof(double) * state.iterations() * a.size());
-  state.counters["bytes"] = state.range(0);
+  state.counters["bytes"] = size_in_bytes;
 }
 
 void benchmark_3dslice_deepcopy_noncontig(benchmark::State &state) {
@@ -137,12 +130,17 @@ void benchmark_3dslice_deepcopy_noncontig(benchmark::State &state) {
   auto space = Kokkos::DefaultExecutionSpace();
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
+  auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, 0);
+  size_t num_elements = sub_view.extent(0);
+  size_t element_size = sizeof(typename decltype(sub_view)::value_type);
+  size_t size_in_bytes = num_elements * element_size;
+
+
   while (state.KeepRunning()) {
     do_iteration(state, MPI_COMM_WORLD, send_recv_slice_deepcopy_noncontig<Kokkos::DefaultExecutionSpace, Kokkos::View<double ***>>, space,
                  rank, a);
   }
-  state.SetBytesProcessed(sizeof(double) * state.iterations() * a.size());
-  state.counters["bytes"] = state.range(0);
+  state.counters["bytes"] = size_in_bytes;
 }
 
 void benchmark_3dslice_deepcopy_noncontig2D(benchmark::State &state) {
@@ -156,12 +154,17 @@ void benchmark_3dslice_deepcopy_noncontig2D(benchmark::State &state) {
   auto space = Kokkos::DefaultExecutionSpace();
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
+  auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, Kokkos::ALL);
+  size_t num_elements = sub_view.extent(0);
+  size_t element_size = sizeof(typename decltype(sub_view)::value_type);
+  size_t size_in_bytes = num_elements * element_size;
+
+
   while (state.KeepRunning()) {
     do_iteration(state, MPI_COMM_WORLD, send_recv_slice_deepcopy_noncontig2D<Kokkos::DefaultExecutionSpace, Kokkos::View<double ***>>, space,
                  rank, a);
   }
-  state.SetBytesProcessed(sizeof(double) * state.iterations() * a.size());
-  state.counters["bytes"] = state.range(0);
+  state.counters["bytes"] = size_in_bytes;
 }
 
 void benchmark_3dslice_datatype_contig(benchmark::State &state) {
@@ -175,12 +178,17 @@ void benchmark_3dslice_datatype_contig(benchmark::State &state) {
   auto space = Kokkos::DefaultExecutionSpace();
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
+  auto sub_view = Kokkos::subview(a, 0, 0, Kokkos::ALL);
+  size_t num_elements = sub_view.extent(0);
+  size_t element_size = sizeof(typename decltype(sub_view)::value_type);
+  size_t size_in_bytes = num_elements * element_size;
+
+
   while (state.KeepRunning()) {
     do_iteration(state, MPI_COMM_WORLD, send_recv_slice_datatype_contig<Kokkos::DefaultExecutionSpace, Kokkos::View<double ***>>, space,
                  rank, a);
   }
-  state.SetBytesProcessed(sizeof(double) * state.iterations() * a.size());
-  state.counters["bytes"] = state.range(0);
+  state.counters["bytes"] = size_in_bytes;
 }
 
 void benchmark_3dslice_datatype_noncontig(benchmark::State &state) {
@@ -194,12 +202,16 @@ void benchmark_3dslice_datatype_noncontig(benchmark::State &state) {
   auto space = Kokkos::DefaultExecutionSpace();
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
+  auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, 0);
+  size_t num_elements = sub_view.extent(0);
+  size_t element_size = sizeof(typename decltype(sub_view)::value_type);
+  size_t size_in_bytes = num_elements * element_size;
+
   while (state.KeepRunning()) {
     do_iteration(state, MPI_COMM_WORLD, send_recv_slice_datatype_noncontig<Kokkos::DefaultExecutionSpace, Kokkos::View<double ***>>, space,
                  rank, a);
   }
-  state.SetBytesProcessed(sizeof(double) * state.iterations() * a.size());
-  state.counters["bytes"] = state.range(0);
+  state.counters["bytes"] = size_in_bytes;
 }
 
 void benchmark_3dslice_datatype_noncontig2D(benchmark::State &state) {
@@ -213,46 +225,51 @@ void benchmark_3dslice_datatype_noncontig2D(benchmark::State &state) {
   auto space = Kokkos::DefaultExecutionSpace();
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
+  auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, Kokkos::ALL);
+  size_t num_elements = sub_view.extent(0);
+  size_t element_size = sizeof(typename decltype(sub_view)::value_type);
+  size_t size_in_bytes = num_elements * element_size;
+
+
   while (state.KeepRunning()) {
     do_iteration(state, MPI_COMM_WORLD, send_recv_slice_datatype_noncontig2D<Kokkos::DefaultExecutionSpace, Kokkos::View<double ***>>, space,
                  rank, a);
   }
-  state.SetBytesProcessed(sizeof(double) * state.iterations() * a.size());
-  state.counters["bytes"] = state.range(0);
+  state.counters["bytes"] = size_in_bytes;
 }
 
 BENCHMARK(benchmark_3dslice_deepcopy_contig)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(4)
-    ->Range(1, 1024);
+    ->RangeMultiplier(2)
+    ->Range(1, 2048);
 
 BENCHMARK(benchmark_3dslice_deepcopy_noncontig)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(4)
-    ->Range(1, 1024);
+    ->RangeMultiplier(2)
+    ->Range(1, 2048);
 
 BENCHMARK(benchmark_3dslice_deepcopy_noncontig2D)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(4)
-    ->Range(1, 1024);
+    ->RangeMultiplier(2)
+    ->Range(1, 2048);
 
 BENCHMARK(benchmark_3dslice_datatype_contig)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(4)
-    ->Range(1, 1024);
+    ->RangeMultiplier(2)
+    ->Range(1, 2048);
 
 BENCHMARK(benchmark_3dslice_datatype_noncontig)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(4)
-    ->Range(1, 1024);
+    ->RangeMultiplier(2)
+    ->Range(1, 2048);
 
 BENCHMARK(benchmark_3dslice_datatype_noncontig2D)
     ->UseManualTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(4)
-    ->Range(1, 1024);
+    ->RangeMultiplier(2)
+    ->Range(1, 2048);
