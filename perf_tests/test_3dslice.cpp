@@ -240,36 +240,36 @@ void benchmark_3dslice_datatype_noncontig2D(benchmark::State &state) {
 
 BENCHMARK(benchmark_3dslice_deepcopy_contig)
     ->UseManualTime()
-    ->Unit(benchmark::kMillisecond)
+    ->Unit(benchmark::kMicrosecond)
     ->RangeMultiplier(2)
-    ->Range(1, 2048);
+    ->Range(1, 1024);
 
 BENCHMARK(benchmark_3dslice_deepcopy_noncontig)
     ->UseManualTime()
-    ->Unit(benchmark::kMillisecond)
+    ->Unit(benchmark::kMicrosecond)
     ->RangeMultiplier(2)
-    ->Range(1, 2048);
+    ->Range(1, 1024);
 
 BENCHMARK(benchmark_3dslice_deepcopy_noncontig2D)
     ->UseManualTime()
-    ->Unit(benchmark::kMillisecond)
+    ->Unit(benchmark::kMicrosecond)
     ->RangeMultiplier(2)
-    ->Range(1, 2048);
+    ->Range(1, 1024);
 
 BENCHMARK(benchmark_3dslice_datatype_contig)
     ->UseManualTime()
-    ->Unit(benchmark::kMillisecond)
+    ->Unit(benchmark::kMicrosecond)
     ->RangeMultiplier(2)
-    ->Range(1, 2048);
+    ->Range(1, 1024);
 
 BENCHMARK(benchmark_3dslice_datatype_noncontig)
     ->UseManualTime()
-    ->Unit(benchmark::kMillisecond)
+    ->Unit(benchmark::kMicrosecond)
     ->RangeMultiplier(2)
-    ->Range(1, 2048);
+    ->Range(1, 1024);
 
 BENCHMARK(benchmark_3dslice_datatype_noncontig2D)
     ->UseManualTime()
-    ->Unit(benchmark::kMillisecond)
+    ->Unit(benchmark::kMicrosecond)
     ->RangeMultiplier(2)
-    ->Range(1, 2048);
+    ->Range(1, 1024);
