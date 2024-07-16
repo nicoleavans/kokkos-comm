@@ -131,13 +131,15 @@ struct System {
     q       = 1.0;
     sigma   = 1.0;
     P       = 1.0;
-    E_left  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_right = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_up    = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_down  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_front = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_back  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_bulk  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
+    auto exec_inst =
+      Kokkos::Experimental::partition_space(Kokkos::DefaultExecutionSpace(), 1, 1, 1, 1, 1, 1, 1);
+    E_left  = exec_inst[left];
+    E_right = exec_inst[right];
+    E_up    = exec_inst[up];
+    E_down  = exec_inst[down];
+    E_front = exec_inst[front];
+    E_back  = exec_inst[back];
+    E_bulk  = exec_inst[bulk];
   }
 
   void setup_subdomain() {
@@ -211,7 +213,7 @@ struct System {
   };
 
   // Compute non-exposed surface, dispatch makes sure that we don't hit elements twice
-  enum { left, right, down, up, front, back };
+  enum { left, right, down, up, front, back, bulk };
 
   template <int Surface>
   struct ComputeSurfaceDT {};
@@ -448,13 +450,15 @@ struct SystemKC_DC {
     q       = 1.0;
     sigma   = 1.0;
     P       = 1.0;
-    E_left  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_right = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_up    = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_down  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_front = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_back  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_bulk  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
+    auto exec_inst =
+      Kokkos::Experimental::partition_space(Kokkos::DefaultExecutionSpace(), 1, 1, 1, 1, 1, 1, 1);
+    E_left  = exec_inst[left];
+    E_right = exec_inst[right];
+    E_up    = exec_inst[up];
+    E_down  = exec_inst[down];
+    E_front = exec_inst[front];
+    E_back  = exec_inst[back];
+    E_bulk  = exec_inst[bulk];
   }
 
   void setup_subdomain() {
@@ -528,7 +532,7 @@ struct SystemKC_DC {
   };
 
   // Compute non-exposed surface, dispatch makes sure that we don't hit elements twice
-  enum { left, right, down, up, front, back };
+  enum { left, right, down, up, front, back, bulk };
 
   template <int Surface>
   struct ComputeSurfaceDT {};
@@ -775,13 +779,15 @@ struct SystemKC_MPIDT {
     q       = 1.0;
     sigma   = 1.0;
     P       = 1.0;
-    E_left  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_right = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_up    = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_down  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_front = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_back  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-    E_bulk  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
+    auto exec_inst =
+      Kokkos::Experimental::partition_space(Kokkos::DefaultExecutionSpace(), 1, 1, 1, 1, 1, 1, 1);
+    E_left  = exec_inst[left];
+    E_right = exec_inst[right];
+    E_up    = exec_inst[up];
+    E_down  = exec_inst[down];
+    E_front = exec_inst[front];
+    E_back  = exec_inst[back];
+    E_bulk  = exec_inst[bulk];
   }
 
   void setup_subdomain() {
@@ -855,7 +861,7 @@ struct SystemKC_MPIDT {
   };
 
   // Compute non-exposed surface, dispatch makes sure that we don't hit elements twice
-  enum { left, right, down, up, front, back };
+  enum { left, right, down, up, front, back, bulk };
 
   template <int Surface>
   struct ComputeSurfaceDT {};
