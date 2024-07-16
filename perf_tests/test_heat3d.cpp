@@ -140,16 +140,6 @@ struct System {
     E_bulk  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
   }
 
-  void destroy_exec_spaces() {
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_left);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_right);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_front);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_back);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_up);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_down);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_bulk);
-  }
-
   void setup_subdomain() {
     int dX = (X + comm.nx - 1) / comm.nx;
     X_lo   = dX * comm.x; X_hi   = X_lo + dX;
@@ -465,16 +455,6 @@ struct SystemKC_DC {
     E_front = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
     E_back  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
     E_bulk  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
-  }
-
-  void destroy_exec_spaces() {
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_left);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_right);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_front);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_back);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_up);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_down);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_bulk);
   }
 
   void setup_subdomain() {
@@ -804,16 +784,6 @@ struct SystemKC_MPIDT {
     E_bulk  = SpaceInstance<Kokkos::DefaultExecutionSpace>::create();
   }
 
-  void destroy_exec_spaces() {
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_left);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_right);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_front);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_back);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_up);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_down);
-    SpaceInstance<Kokkos::DefaultExecutionSpace>::destroy(E_bulk);
-  }
-
   void setup_subdomain() {
     int dX = (X + comm.nx - 1) / comm.nx;
     X_lo   = dX * comm.x; X_hi   = X_lo + dX;
@@ -1083,7 +1053,6 @@ void benchmark_heat3d_mpi(benchmark::State &state) {
   while(state.KeepRunning()){
     do_iteration(state, MPI_COMM_WORLD, f);
   }
-  // sys.destroy_exec_spaces(); //TODO fix
 }
 
 void benchmark_heat3d_kc_dc(benchmark::State &state) {
@@ -1093,7 +1062,6 @@ void benchmark_heat3d_kc_dc(benchmark::State &state) {
   while(state.KeepRunning()){
     do_iteration(state, MPI_COMM_WORLD, f);
   }
-  // sys.destroy_exec_spaces(); //TODO fix
 }
 
 void benchmark_heat3d_kc_mpidt(benchmark::State &state) {
@@ -1103,7 +1071,6 @@ void benchmark_heat3d_kc_mpidt(benchmark::State &state) {
   while(state.KeepRunning()){
     do_iteration(state, MPI_COMM_WORLD, f);
   }
-  // sys.destroy_exec_spaces(); //TODO fix
 }
 
 BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMicrosecond);
