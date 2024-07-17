@@ -1046,5 +1046,5 @@ void benchmark_heat3d_kc_mpidt(benchmark::State &state) {
 }
 
 BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMicrosecond);
-BENCHMARK(benchmark_heat3d_kc_dc)->Iterations(1)->UseManualTime()->Unit(benchmark::kMicrosecond);
+BENCHMARK(benchmark_heat3d_kc_dc)->UseManualTime()->Unit(benchmark::kMicrosecond);
 BENCHMARK(benchmark_heat3d_kc_mpidt)->UseManualTime()->Unit(benchmark::kMicrosecond);
