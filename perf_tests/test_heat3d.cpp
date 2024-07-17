@@ -43,13 +43,13 @@ struct CommHelper {
   }
 
   template <typename ExecSpace, class ViewType>
-  void isend_irecv_dc(const ExecSpace &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, KokkosComm::Req request_send, KokkosComm::Req request_recv){ 
+  void isend_irecv_dc(const ExecSpace &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, KokkosComm::Req &request_send, KokkosComm::Req &request_recv){ 
     request_send = KokkosComm::isend<KokkosComm::Impl::Packer::DeepCopy<ViewType>>(space, sv, dest, tag, comm);
     request_recv = KokkosComm::irecv<KokkosComm::Impl::Packer::DeepCopy<ViewType>>(space, rv, src, tag, comm, NULL); // request_send.wait(); request_recv.wait();
   }
 
   template <typename ExecSpace, class ViewType>
-  void isend_irecv_dt(const ExecSpace &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, KokkosComm::Req request_send, KokkosComm::Req request_recv){ 
+  void isend_irecv_dt(const ExecSpace &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, KokkosComm::Req &request_send, KokkosComm::Req &request_recv){ 
     request_send = KokkosComm::isend<KokkosComm::Impl::Packer::MpiDatatype<ViewType>>(space, sv, dest, tag, comm);
     request_recv = KokkosComm::irecv<KokkosComm::Impl::Packer::MpiDatatype<ViewType>>(space, rv, src, tag, comm, NULL); // request_send.wait(); request_recv.wait();
   }
@@ -554,64 +554,62 @@ struct SystemKC_DC {
   void pack_T_halo() {
     mpi_active_requests = 0;
     int mar             = 0;
-    KokkosComm::Req request_send, request_recv;
     if (X_lo != 0) {
-      comm.isend_irecv_dc(E_left, T_left_out, T_left, comm.left, comm.left, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_left, T_left_out, T_left, comm.left, comm.left, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_lo != 0) {
-      comm.isend_irecv_dc(E_down, T_down_out, T_down, comm.down, comm.down, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_down, T_down_out, T_down, comm.down, comm.down, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_lo != 0) {
-      comm.isend_irecv_dc(E_front, T_front_out, T_front, comm.front, comm.front, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_front, T_front_out, T_front, comm.front, comm.front, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (X_hi != X) {
-      comm.isend_irecv_dc(E_right, T_right_out, T_right, comm.right, comm.right, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_right, T_right_out, T_right, comm.right, comm.right, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_hi != Y) {
-      comm.isend_irecv_dc(E_up, T_up_out, T_up, comm.up, comm.up, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_up, T_up_out, T_up, comm.up, comm.up, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_hi != Z) {
-      comm.isend_irecv_dc(E_back, T_back_out, T_back, comm.back, comm.back, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_back, T_back_out, T_back, comm.back, comm.back, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
   }
 
   void exchange_T_halo() {
     int mar = 0;
-    KokkosComm::Req request_send, request_recv;
     if (X_lo != 0) {
       E_left.fence();
-      comm.isend_irecv_dc(E_left, T_left_out, T_left, comm.left, comm.left, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_left, T_left_out, T_left, comm.left, comm.left, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_lo != 0) {
       E_down.fence();
-      comm.isend_irecv_dc(E_down, T_down_out, T_down, comm.down, comm.down, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_down, T_down_out, T_down, comm.down, comm.down, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_lo != 0) {
       E_front.fence();
-      comm.isend_irecv_dc(E_front, T_front_out, T_front, comm.front, comm.front, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_front, T_front_out, T_front, comm.front, comm.front, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (X_hi != X) {
       E_right.fence();
-      comm.isend_irecv_dc(E_right, T_right_out, T_right, comm.right, comm.right, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_right, T_right_out, T_right, comm.right, comm.right, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_hi != Y) {
       E_up.fence();
-      comm.isend_irecv_dc(E_up, T_up_out, T_up, comm.up, comm.up, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_up, T_up_out, T_up, comm.up, comm.up, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_hi != Z) {
       E_back.fence();
-      comm.isend_irecv_dc(E_back, T_back_out, T_back, comm.back, comm.back, 0, request_send, request_recv);
+      comm.isend_irecv_dc(E_back, T_back_out, T_back, comm.back, comm.back, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     mpi_active_requests = mar;
@@ -883,64 +881,62 @@ struct SystemKC_MPIDT {
   void pack_T_halo() {
     mpi_active_requests = 0;
     int mar             = 0;
-    KokkosComm::Req request_send, request_recv;
     if (X_lo != 0) {
-      comm.isend_irecv_dt(E_left, T_left_out, T_left, comm.left, comm.left, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_left, T_left_out, T_left, comm.left, comm.left, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_lo != 0) {
-      comm.isend_irecv_dt(E_down, T_down_out, T_down, comm.down, comm.down, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_down, T_down_out, T_down, comm.down, comm.down, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_lo != 0) {
-      comm.isend_irecv_dt(E_front, T_front_out, T_front, comm.front, comm.front, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_front, T_front_out, T_front, comm.front, comm.front, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (X_hi != X) {
-      comm.isend_irecv_dt(E_right, T_right_out, T_right, comm.right, comm.right, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_right, T_right_out, T_right, comm.right, comm.right, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_hi != Y) {
-      comm.isend_irecv_dt(E_up, T_up_out, T_up, comm.up, comm.up, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_up, T_up_out, T_up, comm.up, comm.up, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_hi != Z) {
-      comm.isend_irecv_dt(E_back, T_back_out, T_back, comm.back, comm.back, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_back, T_back_out, T_back, comm.back, comm.back, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
   }
 
   void exchange_T_halo() {
     int mar = 0;
-    KokkosComm::Req request_send, request_recv;
     if (X_lo != 0) {
       E_left.fence();
-      comm.isend_irecv_dt(E_left, T_left_out, T_left, comm.left, comm.left, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_left, T_left_out, T_left, comm.left, comm.left, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_lo != 0) {
       E_down.fence();
-      comm.isend_irecv_dt(E_down, T_down_out, T_down, comm.down, comm.down, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_down, T_down_out, T_down, comm.down, comm.down, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_lo != 0) {
       E_front.fence();
-      comm.isend_irecv_dt(E_front, T_front_out, T_front, comm.front, comm.front, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_front, T_front_out, T_front, comm.front, comm.front, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (X_hi != X) {
       E_right.fence();
-      comm.isend_irecv_dt(E_right, T_right_out, T_right, comm.right, comm.right, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_right, T_right_out, T_right, comm.right, comm.right, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Y_hi != Y) {
       E_up.fence();
-      comm.isend_irecv_dt(E_up, T_up_out, T_up, comm.up, comm.up, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_up, T_up_out, T_up, comm.up, comm.up, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     if (Z_hi != Z) {
       E_back.fence();
-      comm.isend_irecv_dt(E_back, T_back_out, T_back, comm.back, comm.back, 0, request_send, request_recv);
+      comm.isend_irecv_dt(E_back, T_back_out, T_back, comm.back, comm.back, 0, kc_requests_send[mar], kc_requests_recv[mar]);
       mar++;
     }
     mpi_active_requests = mar;
@@ -1050,5 +1046,5 @@ void benchmark_heat3d_kc_mpidt(benchmark::State &state) {
 }
 
 BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMicrosecond);
-BENCHMARK(benchmark_heat3d_kc_dc)->UseManualTime()->Unit(benchmark::kMicrosecond);
+BENCHMARK(benchmark_heat3d_kc_dc)->Iterations(1)->UseManualTime()->Unit(benchmark::kMicrosecond);
 BENCHMARK(benchmark_heat3d_kc_mpidt)->UseManualTime()->Unit(benchmark::kMicrosecond);
