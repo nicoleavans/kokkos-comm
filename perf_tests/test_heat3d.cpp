@@ -625,7 +625,6 @@ struct SystemKC_DC {
     int x = T.extent(0); int y = T.extent(1); int z = T.extent(2);
     if (mpi_active_requests > 0) {
       for(int i = 0; i < mpi_active_requests; i++){
-
         kc_requests_recv[i].wait();
         kc_requests_send[i].wait();
       }
