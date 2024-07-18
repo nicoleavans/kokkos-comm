@@ -108,7 +108,7 @@ void benchmark_3dslice_deepcopy_contig(benchmark::State &state) {
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
   auto sub_view = Kokkos::subview(a, 0, 0, Kokkos::ALL);
-  size_t num_elements = sub_view.extent(0);
+  size_t num_elements = sub_view.span();
   size_t element_size = sizeof(typename decltype(sub_view)::value_type);
   size_t size_in_bytes = num_elements * element_size;
 
@@ -131,7 +131,7 @@ void benchmark_3dslice_deepcopy_noncontig(benchmark::State &state) {
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
   auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, 0);
-  size_t num_elements = sub_view.extent(0);
+  size_t num_elements = sub_view.span();
   size_t element_size = sizeof(typename decltype(sub_view)::value_type);
   size_t size_in_bytes = num_elements * element_size;
 
@@ -155,7 +155,7 @@ void benchmark_3dslice_deepcopy_noncontig2D(benchmark::State &state) {
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
   auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, Kokkos::ALL);
-  size_t num_elements = sub_view.extent(0);
+  size_t num_elements = sub_view.span();
   size_t element_size = sizeof(typename decltype(sub_view)::value_type);
   size_t size_in_bytes = num_elements * element_size;
 
@@ -179,7 +179,7 @@ void benchmark_3dslice_datatype_contig(benchmark::State &state) {
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
   auto sub_view = Kokkos::subview(a, 0, 0, Kokkos::ALL);
-  size_t num_elements = sub_view.extent(0);
+  size_t num_elements = sub_view.span();
   size_t element_size = sizeof(typename decltype(sub_view)::value_type);
   size_t size_in_bytes = num_elements * element_size;
 
@@ -203,7 +203,7 @@ void benchmark_3dslice_datatype_noncontig(benchmark::State &state) {
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
   auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, 0);
-  size_t num_elements = sub_view.extent(0);
+  size_t num_elements = sub_view.span();
   size_t element_size = sizeof(typename decltype(sub_view)::value_type);
   size_t size_in_bytes = num_elements * element_size;
 
@@ -226,7 +226,7 @@ void benchmark_3dslice_datatype_noncontig2D(benchmark::State &state) {
   Kokkos::View<double ***> a("3DView", state.range(0), state.range(0), state.range(0));
 
   auto sub_view = Kokkos::subview(a, 0, Kokkos::ALL, Kokkos::ALL);
-  size_t num_elements = sub_view.extent(0);
+  size_t num_elements = sub_view.span();
   size_t element_size = sizeof(typename decltype(sub_view)::value_type);
   size_t size_in_bytes = num_elements * element_size;
 
