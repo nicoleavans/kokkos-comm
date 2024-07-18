@@ -49,7 +49,7 @@ void benchmark_osu_latency_KokkosComm_sendrecv(benchmark::State &state) {
   }
 
   auto space      = Kokkos::DefaultExecutionSpace();
-  using view_type = Kokkos::View<char * /*, Kokkos::HostSpace*/>;
+  using view_type = Kokkos::View<char * /*, Kokkos::HostSpace*/>; // test with and without HostSpace param
   view_type a("A", state.range(0));
 
   while (state.KeepRunning()) {
