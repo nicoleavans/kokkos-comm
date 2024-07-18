@@ -79,11 +79,11 @@ void benchmark_osu_latency_MPI_sendrecv(benchmark::State &state) {
 BENCHMARK(benchmark_osu_latency_KokkosComm_sendrecv)
     ->UseManualTime()
     ->Unit(benchmark::kMicrosecond)
-    ->RangeMultiplier(8)
+    ->RangeMultiplier(2)
     ->Range(1, 1 << 28);
     
 BENCHMARK(benchmark_osu_latency_MPI_sendrecv)
     ->UseManualTime()
     ->Unit(benchmark::kMicrosecond)
-    ->RangeMultiplier(8)
+    ->RangeMultiplier(2)
     ->Range(1, 1 << 28);
