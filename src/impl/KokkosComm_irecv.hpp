@@ -33,7 +33,6 @@ template <typename Packer, KokkosExecutionSpace ExecSpace, KokkosView RecvView>
 KokkosComm::Req irecv(const ExecSpace &space, RecvView &rv, int src, int tag, MPI_Comm comm, void* dummy) {
   Kokkos::Profiling::pushRegion("KokkosComm::Impl::irecv");
   KokkosComm::Req req;
-
   if(KokkosComm::is_contiguous(rv)){
     using RecvScalar = typename RecvView::value_type;
     MPI_Irecv(KokkosComm::data_handle(rv), KokkosComm::span(rv), mpi_type_v<RecvScalar>, src, tag, comm, &req.mpi_req());
@@ -55,14 +54,12 @@ KokkosComm::Req irecv(const ExecSpace &space, RecvView &rv, int src, int tag, MP
 template <KokkosView RecvView>
 void irecv(RecvView &rv, int src, int tag, MPI_Comm comm, MPI_Request &req) {
   Kokkos::Profiling::pushRegion("KokkosComm::Impl::irecv");
-
   if (KokkosComm::is_contiguous(rv)) {
     using RecvScalar = typename RecvView::value_type;
     MPI_Irecv(KokkosComm::data_handle(rv), KokkosComm::span(rv), mpi_type_v<RecvScalar>, src, tag, comm, &req);
   } else {
     throw std::runtime_error("Only contiguous irecv view supported");
   }
-
   Kokkos::Profiling::popRegion();
 }
 

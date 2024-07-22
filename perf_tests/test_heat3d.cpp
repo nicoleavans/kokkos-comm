@@ -24,6 +24,8 @@ struct CommHelper {
     while ((nranks / nx) % ny != 0) ny++;
 
     nz    = nranks / nx / ny;
+    nx=1; ny=2; nz=1; // Allow non-contiguous views to be transmitted on two ranks for testing
+
     x     = me % nx;
     y     = (me / nx) % ny;
     z     = (me / nx / ny);
@@ -465,8 +467,7 @@ struct SystemKC_DC {
   void timestep() {
     for (int t = 0; t <= N; t++) {
       if (t > N / 2) P = 0.0;
-      pack_T_halo();       // Overlap O1
-      compute_inner_dT();  // Overlap O1
+      compute_inner_dT();
       Kokkos::fence();
       exchange_T_halo();
       compute_surface_dT();
@@ -549,35 +550,6 @@ struct SystemKC_DC {
                        ((z == (NZ - 1) && Z_hi == Z) ? 1 : 0);
     dT_xyz -= sigma * T_xyz * T_xyz * T_xyz * T_xyz * num_surfaces;
     dT(x, y, z) = dT_xyz;
-  }
-
-  void pack_T_halo() {
-    mpi_active_requests = 0;
-    int mar             = 0;
-    if (X_lo != 0) {
-      comm.isend_irecv_dc(E_left, T_left_out, T_left, comm.left, comm.left, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Y_lo != 0) {
-      comm.isend_irecv_dc(E_down, T_down_out, T_down, comm.down, comm.down, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Z_lo != 0) {
-      comm.isend_irecv_dc(E_front, T_front_out, T_front, comm.front, comm.front, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (X_hi != X) {
-      comm.isend_irecv_dc(E_right, T_right_out, T_right, comm.right, comm.right, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Y_hi != Y) {
-      comm.isend_irecv_dc(E_up, T_up_out, T_up, comm.up, comm.up, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Z_hi != Z) {
-      comm.isend_irecv_dc(E_back, T_back_out, T_back, comm.back, comm.back, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
   }
 
   void exchange_T_halo() {
@@ -791,8 +763,7 @@ struct SystemKC_MPIDT {
   void timestep() {
     for (int t = 0; t <= N; t++) {
       if (t > N / 2) P = 0.0;
-      pack_T_halo();       // Overlap O1
-      compute_inner_dT();  // Overlap O1
+      compute_inner_dT();
       Kokkos::fence();
       exchange_T_halo();
       compute_surface_dT();
@@ -875,35 +846,6 @@ struct SystemKC_MPIDT {
                        ((z == (NZ - 1) && Z_hi == Z) ? 1 : 0);
     dT_xyz -= sigma * T_xyz * T_xyz * T_xyz * T_xyz * num_surfaces;
     dT(x, y, z) = dT_xyz;
-  }
-
-  void pack_T_halo() {
-    mpi_active_requests = 0;
-    int mar             = 0;
-    if (X_lo != 0) {
-      comm.isend_irecv_dt(E_left, T_left_out, T_left, comm.left, comm.left, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Y_lo != 0) {
-      comm.isend_irecv_dt(E_down, T_down_out, T_down, comm.down, comm.down, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Z_lo != 0) {
-      comm.isend_irecv_dt(E_front, T_front_out, T_front, comm.front, comm.front, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (X_hi != X) {
-      comm.isend_irecv_dt(E_right, T_right_out, T_right, comm.right, comm.right, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Y_hi != Y) {
-      comm.isend_irecv_dt(E_up, T_up_out, T_up, comm.up, comm.up, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
-    if (Z_hi != Z) {
-      comm.isend_irecv_dt(E_back, T_back_out, T_back, comm.back, comm.back, 0, kc_requests_send[mar], kc_requests_recv[mar]);
-      mar++;
-    }
   }
 
   void exchange_T_halo() {
@@ -1018,30 +960,36 @@ struct SystemKC_MPIDT {
 };
 
 void benchmark_heat3d_mpi(benchmark::State &state) {
+  Kokkos::Profiling::pushRegion("benchmark_heat3d_mpi");
   System sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
   auto f = std::bind(&System::timestep, &sys);
   while(state.KeepRunning()){
     do_iteration(state, MPI_COMM_WORLD, f);
   }
+  Kokkos::Profiling::popRegion();
 }
 
 void benchmark_heat3d_kc_dc(benchmark::State &state) {
+  Kokkos::Profiling::pushRegion("benchmark_heat3d_kc_dc");
   SystemKC_DC sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
   auto f = std::bind(&SystemKC_DC::timestep, &sys);
   while(state.KeepRunning()){
     do_iteration(state, MPI_COMM_WORLD, f);
   }
+  Kokkos::Profiling::popRegion();
 }
 
 void benchmark_heat3d_kc_mpidt(benchmark::State &state) {
+  Kokkos::Profiling::pushRegion("benchmark_heat3d_kc_mpidt");
   SystemKC_MPIDT sys(MPI_COMM_WORLD);
   sys.setup_subdomain();
   auto f = std::bind(&SystemKC_MPIDT::timestep, &sys);
   while(state.KeepRunning()){
     do_iteration(state, MPI_COMM_WORLD, f);
   }
+  Kokkos::Profiling::popRegion();
 }
 
 BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMicrosecond);
