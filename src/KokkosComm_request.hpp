@@ -48,12 +48,22 @@ class Req {
   MPI_Request &mpi_req() { return record_->req_; }
 
   void wait() {
+    Kokkos::Profiling::pushRegion("KokkosComm::Req.wait()");
+    Kokkos::Profiling::pushRegion("MPI_Wait()");
     MPI_Wait(&(record_->req_), MPI_STATUS_IGNORE);
+    Kokkos::Profiling::popRegion();
+    Kokkos::Profiling::pushRegion("Record Loop");
     for (auto &f : record_->functions_after_wait_) {
       f();
     }
+    Kokkos::Profiling::popRegion();
+    Kokkos::Profiling::pushRegion("until_waits_.clear()");
     record_->until_waits_.clear();  // drop any views we're keeping alive until wait()
+    Kokkos::Profiling::popRegion();
+    Kokkos::Profiling::pushRegion("functions_after_wait_.clear()");
     record_->functions_after_wait_.clear();
+    Kokkos::Profiling::popRegion();
+    Kokkos::Profiling::popRegion();
   }
 
   // keep a reference to this view around until wait() is called

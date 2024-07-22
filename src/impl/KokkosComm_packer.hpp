@@ -45,12 +45,16 @@ struct DeepCopy {
     // using KCT = KokkosComm::Traits<View>;
 
     if constexpr (KokkosComm::rank<View>() == 1) {
+      Kokkos::Profiling::pushRegion("DeepCopy::allocate_packed_for() rank 1");
       non_const_packed_view_type packed(Kokkos::view_alloc(space, Kokkos::WithoutInitializing, label), src.extent(0));
+      Kokkos::Profiling::popRegion();
       return args_type(packed, MPI_PACKED,
                        KokkosComm::span(packed) * sizeof(typename non_const_packed_view_type::value_type));
     } else if constexpr (KokkosComm::rank<View>() == 2) {
+      Kokkos::Profiling::pushRegion("DeepCopy::allocate_packed_for() rank 2");
       non_const_packed_view_type packed(Kokkos::view_alloc(space, Kokkos::WithoutInitializing, label), src.extent(0),
                                         src.extent(1));
+      Kokkos::Profiling::popRegion();
       return args_type(packed, MPI_PACKED,
                        KokkosComm::span(packed) * sizeof(typename non_const_packed_view_type::value_type));
     } else {
@@ -61,13 +65,17 @@ struct DeepCopy {
   template <KokkosExecutionSpace ExecSpace>
   static args_type pack(const ExecSpace &space, const View &src) {
     args_type args = allocate_packed_for(space, "DeepCopy::pack", src);
+    Kokkos::Profiling::pushRegion("DeepCopy::pack()");
     Kokkos::deep_copy(space, args.view, src);
+    Kokkos::Profiling::popRegion();
     return args;
   }
 
   template <KokkosExecutionSpace ExecSpace>
   static void unpack_into(const ExecSpace &space, const View &dst, const non_const_packed_view_type &src) {
+    Kokkos::Profiling::pushRegion("DeepCopy::unpack_into");
     Kokkos::deep_copy(space, dst, src);
+    Kokkos::Profiling::popRegion();
   }
 };
 
@@ -80,6 +88,7 @@ struct MpiDatatype {
   // a datatype that describes the data in the view
   template <KokkosExecutionSpace ExecSpace>
   static args_type allocate_packed_for(const ExecSpace & /*space*/, const std::string & /*label*/, const View &src) {
+    Kokkos::Profiling::pushRegion("MpiDatatype::allocate_packed_for");
     using ValueType = typename View::value_type;
 
     // using KCT = KokkosComm::Traits<View>;
@@ -92,6 +101,7 @@ struct MpiDatatype {
       type = newtype;
     }
     MPI_Type_commit(&type);
+    Kokkos::Profiling::popRegion();
     return args_type(src, type, 1);
   }
 
