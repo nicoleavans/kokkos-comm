@@ -28,7 +28,15 @@ struct Is_LayoutLeft {
 
 template <typename Space, typename View>
 void send_recv_slice_deepcopy_contig(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  auto sub_view = Kokkos::subview(v, 0, 0, Kokkos::ALL); // contig
+  struct {int x; int y; int z;} range;
+  range.x = range.y = range.z = 0;
+  if constexpr (Is_LayoutLeft<View>::value){
+    range.x = v.extent(0); range.y = 0; range.z = 0;
+  } else {
+    range.x = 0; range.y = 0; range.z = v.extent(2);
+  }
+  auto sub_view = Kokkos::subview(v, range.x, range.y, range.z);
+  assert(sub_view.span_is_contiguous());
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::DeepCopy<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -67,7 +75,15 @@ void send_recv_slice_deepcopy_noncontig2D(benchmark::State &, MPI_Comm comm, con
 
 template <typename Space, typename View>
 void send_recv_slice_datatype_contig(benchmark::State &, MPI_Comm comm, const Space &space, int rank, const View &v) {
-  auto sub_view = Kokkos::subview(v, 0, 0, Kokkos::ALL); // contig
+  struct {int x; int y; int z;} range;
+  range.x = range.y = range.z = 0;
+  if constexpr (Is_LayoutLeft<View>::value){
+    range.x = v.extent(0); range.y = 0; range.z = 0;
+  } else {
+    range.x = 0; range.y = 0; range.z = v.extent(2);
+  }
+  auto sub_view = Kokkos::subview(v, range.x, range.y, range.z);
+  assert(sub_view.span_is_contiguous());
   if (0 == rank) {
     KokkosComm::Req sendreq = KokkosComm::isend<KokkosComm::Impl::Packer::MpiDatatype<decltype(sub_view)>>(space, sub_view, 1, 0, comm);
     sendreq.wait();
@@ -107,6 +123,7 @@ void send_recv_slice_datatype_noncontig2D(benchmark::State &, MPI_Comm comm, con
 void benchmark_3dslice_deepcopy_contig(benchmark::State &state) {
   int rank, size;
   struct {int x; int y; int z;} range;
+  range.x = range.y = range.z = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   if (size < 2) {
@@ -117,13 +134,9 @@ void benchmark_3dslice_deepcopy_contig(benchmark::State &state) {
   typedef Kokkos::View<double ***> vT;
   vT a("3DView", state.range(0), state.range(0), state.range(0));
   if constexpr (Is_LayoutLeft<vT>::value){
-    range.x = a.extent(0);
-    range.y = 0;
-    range.z = 0;
+    range.x = a.extent(0); range.y = 0; range.z = 0;
   } else {
-    range.x = 0;
-    range.y = 0;
-    range.z = a.extent(2);
+    range.x = 0; range.y = 0; range.z = a.extent(2);
   }
   auto sub_view = Kokkos::subview(a, range.x, range.y, range.z);
   assert(sub_view.span_is_contiguous());
@@ -190,6 +203,7 @@ void benchmark_3dslice_deepcopy_noncontig2D(benchmark::State &state) {
 void benchmark_3dslice_datatype_contig(benchmark::State &state) {
   int rank, size;
   struct {int x; int y; int z;} range;
+  range.x = range.y = range.z = 0;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   if (size < 2) {
@@ -200,13 +214,9 @@ void benchmark_3dslice_datatype_contig(benchmark::State &state) {
   typedef Kokkos::View<double ***> vT;
   vT a("3DView", state.range(0), state.range(0), state.range(0));
   if constexpr (Is_LayoutLeft<vT>::value){
-    range.x = a.extent(0);
-    range.y = 0;
-    range.z = 0;
+    range.x = a.extent(0); range.y = 0; range.z = 0;
   } else {
-    range.x = 0;
-    range.y = 0;
-    range.z = a.extent(2);
+    range.x = 0; range.y = 0; range.z = a.extent(2);
   }
   auto sub_view = Kokkos::subview(a, range.x, range.y, range.z);
   assert(sub_view.span_is_contiguous());
@@ -276,17 +286,17 @@ BENCHMARK(benchmark_3dslice_deepcopy_contig)
     ->RangeMultiplier(2)
     ->Range(1, 1024);
 
-BENCHMARK(benchmark_3dslice_deepcopy_noncontig)
-    ->UseManualTime()
-    ->Unit(benchmark::kMicrosecond)
-    ->RangeMultiplier(2)
-    ->Range(1, 1024);
+// BENCHMARK(benchmark_3dslice_deepcopy_noncontig)
+//     ->UseManualTime()
+//     ->Unit(benchmark::kMicrosecond)
+//     ->RangeMultiplier(2)
+//     ->Range(1, 1024);
 
-BENCHMARK(benchmark_3dslice_deepcopy_noncontig2D)
-    ->UseManualTime()
-    ->Unit(benchmark::kMicrosecond)
-    ->RangeMultiplier(2)
-    ->Range(1, 1024);
+// BENCHMARK(benchmark_3dslice_deepcopy_noncontig2D)
+//     ->UseManualTime()
+//     ->Unit(benchmark::kMicrosecond)
+//     ->RangeMultiplier(2)
+//     ->Range(1, 1024);
 
 BENCHMARK(benchmark_3dslice_datatype_contig)
     ->UseManualTime()
@@ -294,14 +304,14 @@ BENCHMARK(benchmark_3dslice_datatype_contig)
     ->RangeMultiplier(2)
     ->Range(1, 1024);
 
-BENCHMARK(benchmark_3dslice_datatype_noncontig)
-    ->UseManualTime()
-    ->Unit(benchmark::kMicrosecond)
-    ->RangeMultiplier(2)
-    ->Range(1, 1024);
+// BENCHMARK(benchmark_3dslice_datatype_noncontig)
+//     ->UseManualTime()
+//     ->Unit(benchmark::kMicrosecond)
+//     ->RangeMultiplier(2)
+//     ->Range(1, 1024);
 
-BENCHMARK(benchmark_3dslice_datatype_noncontig2D)
-    ->UseManualTime()
-    ->Unit(benchmark::kMicrosecond)
-    ->RangeMultiplier(2)
-    ->Range(1, 1024);
+// BENCHMARK(benchmark_3dslice_datatype_noncontig2D)
+//     ->UseManualTime()
+//     ->Unit(benchmark::kMicrosecond)
+//     ->RangeMultiplier(2)
+//     ->Range(1, 1024);
