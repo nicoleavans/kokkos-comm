@@ -18,14 +18,6 @@
 #include "KokkosComm.hpp"
 #include <cmath>
 
-// template <class T>
-// struct Is_LayoutLeft {
-//   enum : bool {
-//     value = std::is_same<typename T::traits::array_layout,
-//                          Kokkos::LayoutLeft>::value
-//   };
-// };
-
 template<typename T> 
 constexpr inline bool Is_LayoutLeft = std::is_same<typename T::traits::array_layout, Kokkos::LayoutLeft>::value;
 
