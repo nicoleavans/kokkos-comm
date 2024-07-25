@@ -40,20 +40,32 @@ struct CommHelper {
   template <class ViewType>
   void isend_irecv(int partner, ViewType send_buffer, ViewType recv_buffer,
                     MPI_Request* request_send, MPI_Request* request_recv) { 
+    Kokkos::Profiling::pushRegion("MPI_Irecv");
     MPI_Irecv(recv_buffer.data(), recv_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_recv);
+    Kokkos::Profiling::popRegion();
+    Kokkos::Profiling::pushRegion("MPI_Isend");
     MPI_Isend(send_buffer.data(), send_buffer.size(), MPI_DOUBLE, partner, 1, comm, request_send);
+    Kokkos::Profiling::popRegion();
   }
 
   template <typename ExecSpace, class ViewType>
   void isend_irecv_dc(const ExecSpace &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, KokkosComm::Req &request_send, KokkosComm::Req &request_recv){ 
+    Kokkos::Profiling::pushRegion("KokkosComm::isend<KokkosComm::Impl::Packer::DeepCopy");
     request_send = KokkosComm::isend<KokkosComm::Impl::Packer::DeepCopy<ViewType>>(space, sv, dest, tag, comm);
+    Kokkos::Profiling::popRegion();
+    Kokkos::Profiling::pushRegion("KokkosComm::irecv<KokkosComm::Impl::Packer::DeepCopy");
     request_recv = KokkosComm::irecv<KokkosComm::Impl::Packer::DeepCopy<ViewType>>(space, rv, src, tag, comm, NULL); // request_send.wait(); request_recv.wait();
+    Kokkos::Profiling::popRegion();
   }
 
   template <typename ExecSpace, class ViewType>
   void isend_irecv_dt(const ExecSpace &space, const ViewType &sv, ViewType &rv, int src, int dest, int tag, KokkosComm::Req &request_send, KokkosComm::Req &request_recv){ 
+    Kokkos::Profiling::pushRegion("KokkosComm::isend<KokkosComm::Impl::Packer::MpiDatatype");
     request_send = KokkosComm::isend<KokkosComm::Impl::Packer::MpiDatatype<ViewType>>(space, sv, dest, tag, comm);
+    Kokkos::Profiling::popRegion();
+    Kokkos::Profiling::pushRegion("KokkosComm::irecv<KokkosComm::Impl::Packer::MpiDatatype");
     request_recv = KokkosComm::irecv<KokkosComm::Impl::Packer::MpiDatatype<ViewType>>(space, rv, src, tag, comm, NULL); // request_send.wait(); request_recv.wait();
+    Kokkos::Profiling::popRegion();
   }
 };
 
@@ -307,8 +319,12 @@ struct System {
     using policy_back_t = Kokkos::MDRangePolicy<Kokkos::Rank<2>, ComputeSurfaceDT<back>, int>;
     int x = T.extent(0); int y = T.extent(1); int z = T.extent(2);
     if (mpi_active_requests > 0) {
+      Kokkos::Profiling::pushRegion("MPI_Waitall mpi_requests_send");
       MPI_Waitall(mpi_active_requests, mpi_requests_send, MPI_STATUSES_IGNORE);
+      Kokkos::Profiling::popRegion();
+      Kokkos::Profiling::pushRegion("MPI_Waitall mpi_requests_recv");
       MPI_Waitall(mpi_active_requests, mpi_requests_recv, MPI_STATUSES_IGNORE);
+      Kokkos::Profiling::popRegion();
     }
     
     Kokkos::parallel_for(
@@ -367,7 +383,9 @@ struct System {
             Kokkos::Experimental::WorkItemProperty::HintLightWeight),
         UpdateT(T, dT, dt), my_T);
     double sum_T;
+    Kokkos::Profiling::pushRegion("MPI_Allreduce");
     MPI_Allreduce(&my_T, &sum_T, 1, MPI_DOUBLE, MPI_SUM, comm.comm);
+    Kokkos::Profiling::popRegion();
     return sum_T;
   }
 };
@@ -992,6 +1010,6 @@ void benchmark_heat3d_kc_mpidt(benchmark::State &state) {
   Kokkos::Profiling::popRegion();
 }
 
-BENCHMARK(benchmark_heat3d_mpi)->UseManualTime()->Unit(benchmark::kMicrosecond);
-BENCHMARK(benchmark_heat3d_kc_dc)->UseManualTime()->Unit(benchmark::kMicrosecond);
-BENCHMARK(benchmark_heat3d_kc_mpidt)->UseManualTime()->Unit(benchmark::kMicrosecond);
+BENCHMARK(benchmark_heat3d_mpi)->Iterations(1)->UseManualTime()->Unit(benchmark::kMicrosecond);
+BENCHMARK(benchmark_heat3d_kc_dc)->Iterations(1)->UseManualTime()->Unit(benchmark::kMicrosecond);
+BENCHMARK(benchmark_heat3d_kc_mpidt)->Iterations(1)->UseManualTime()->Unit(benchmark::kMicrosecond);
