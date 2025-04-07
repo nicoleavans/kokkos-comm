@@ -40,8 +40,9 @@ class Req<Mpi> {
   };
 
   struct Record {
-    Record() : req_(MPI_REQUEST_NULL) {}
+    Record() : req_(MPI_REQUEST_NULL), mpix_req_() {}
     MPI_Request req_;
+    MPIX_Request mpix_req_;
     std::vector<std::function<void()>> postWaits_;
   };
 
@@ -49,7 +50,7 @@ class Req<Mpi> {
   Req() : record_(std::make_shared<Record>()) {}
 
   MPI_Request &mpi_request() { return record_->req_; }
-
+  MPIX_Request &mpix_request() { return record_->mpix_req_; }
   // keep a reference to this view around until wait() is called
   template <typename View>
   void extend_view_lifetime(const View &v) {
