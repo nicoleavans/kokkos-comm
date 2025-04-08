@@ -20,7 +20,7 @@
 #include <mpipcl.h>
 
 #include <KokkosComm/traits.hpp>
-#include "KokkosComm/mpi/req.hpp"
+#include "req.hpp"
 
 #include "impl/types.hpp"
 
@@ -106,8 +106,11 @@ class Channel {
 
   void wait() {
     Kokkos::Tools::pushRegion("KokkosComm::Channel::wait");
-    wait_all(send_reqs_);
-    wait_all(recv_reqs_);
+    std::vector<Req<Mpi>> reqs;
+    reqs.reserve(send_reqs_.size() + recv_reqs_.size());
+    reqs.insert(reqs.end(), send_reqs_.begin(), send_reqs_.end());
+    reqs.insert(reqs.end(), recv_reqs_.begin(), recv_reqs_.end());
+    wait_all(reqs);
     Kokkos::Tools::popRegion();
   }
 
