@@ -19,19 +19,19 @@
 #include <KokkosComm/KokkosComm.hpp>
 
 template <typename View>
-void persistent_send_recv(benchmark::State &, MPI_Comm comm, int rank, const View &v) {
+void partitioned_send_recv(benchmark::State &, MPI_Comm comm, int rank, const View &v) {
   int size;
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   const int dest_rank = (rank + 1) % size;         // send to next rank
   const int src_rank  = (rank - 1 + size) % size;  // recv from prev rank
   KokkosComm::Channel<> channel(dest_rank, src_rank, 42, comm);
-  channel.sendinit(v);
-  channel.recvinit(v);
-  channel.start();
-  channel.wait();
+  channel.psendinit(v);
+  channel.precvinit(v);
+  channel.pstart();
+  channel.pwait();
 }
 
-void benchmark_persistent_sendrecv(benchmark::State &state) {
+void benchmark_partitioned_sendrecv(benchmark::State &state) {
   int rank, size;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -44,10 +44,10 @@ void benchmark_persistent_sendrecv(benchmark::State &state) {
   view_type a("", 1000000);
 
   while (state.KeepRunning()) {
-    do_iteration(state, MPI_COMM_WORLD, persistent_send_recv<view_type>, rank, a);
+    do_iteration(state, MPI_COMM_WORLD, partitioned_send_recv<view_type>, rank, a);
   }
 
   state.SetBytesProcessed(sizeof(Scalar) * state.iterations() * a.size() * 2);
 }
 
-BENCHMARK(benchmark_persistent_sendrecv)->UseManualTime()->Unit(benchmark::kMillisecond);
+BENCHMARK(benchmark_partitioned_sendrecv)->UseManualTime()->Unit(benchmark::kMillisecond);
