@@ -60,7 +60,7 @@ void allreduce(View const &v, MPI_Op op, MPI_Comm comm) {
 
   using Scalar = typename View::value_type;
 
-  //static_assert(KokkosComm::rank<View>() <= 1, "allreduce for View::rank > 1 not supported");
+  static_assert(KokkosComm::rank<View>() <= 1, "allreduce for View::rank > 1 not supported");
 
   if (!KokkosComm::is_contiguous(v)) {
     throw std::runtime_error("low-level allgather requires contiguous recv view");
